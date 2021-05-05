@@ -52,7 +52,6 @@ Global metrics
 | `azure_loganalytics_query_time`     | Summary metric about query execution time (incl. all subqueries)               |
 | `azure_loganalytics_query_results`  | Number of results from query                                                   |
 | `azure_loganalytics_query_requests` | Count of requests (eg paged subqueries) per query                              |
-| `azure_loganalytics_ratelimit`      | Current rate limit value from the Azure loganalytics API                      |
 
 
 Example

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -28,12 +27,10 @@ var (
 	argparser *flags.Parser
 	opts      config.Opts
 
-	Config    kusto.Config
+	Config kusto.Config
 
-	AzureAuthorizer       autorest.Authorizer
-	OpInsightsAuthorizer  autorest.Authorizer
-	AzureSubscriptions    []subscriptions.Subscription
-	AzureEnvironment      azure.Environment
+	OpInsightsAuthorizer autorest.Authorizer
+	AzureEnvironment     azure.Environment
 
 	metricCache *cache.Cache
 
@@ -120,12 +117,6 @@ func readConfig() {
 // Init and build Azure authorzier
 func initAzureConnection() {
 	var err error
-
-	// setup azure authorizer
-	AzureAuthorizer, err = auth.NewAuthorizerFromEnvironment()
-	if err != nil {
-		log.Panic(err)
-	}
 
 	AzureEnvironment, err = azure.EnvironmentFromName(*opts.Azure.Environment)
 	if err != nil {

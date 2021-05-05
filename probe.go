@@ -12,12 +12,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
 	"net/http"
-	"strconv"
 	"time"
 )
 
 const (
-	RESOURCEGRAPH_QUERY_OPTIONS_TOP = 1000
+	OPINSIGHTS_URL_SUFFIX = "/v1"
 )
 
 func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
@@ -44,14 +43,8 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 
-	defaultSubscriptions := []string{}
-	for _, subscription := range AzureSubscriptions {
-		defaultSubscriptions = append(defaultSubscriptions, *subscription.SubscriptionID)
-	}
-
-	// Create and authorize a ResourceGraph client
-//	queryClient := operationalinsights.NewQueryClientWithBaseURI(AzureEnvironment.ResourceIdentifiers.OperationalInsights + "/v1/")
-	queryClient := operationalinsights.NewQueryClient()
+	// Create and authorize a operationalinsights client
+	queryClient := operationalinsights.NewQueryClientWithBaseURI(AzureEnvironment.ResourceIdentifiers.OperationalInsights + OPINSIGHTS_URL_SUFFIX)
 	queryClient.Authorizer = OpInsightsAuthorizer
 	queryClient.ResponseInspector = respondDecorator()
 
@@ -83,7 +76,6 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 			}
 			startTime := time.Now()
 
-
 			contextLogger := probeLogger.WithField("metric", queryConfig.Metric)
 
 			if queryConfig.Timespan == nil {
@@ -100,8 +92,8 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 				// Set options
 				workspaces := []string{}
 				queryBody := operationalinsights.QueryBody{
-					Query: &queryConfig.Query,
-					Timespan: queryConfig.Timespan,
+					Query:      &queryConfig.Query,
+					Timespan:   queryConfig.Timespan,
 					Workspaces: &workspaces,
 				}
 
@@ -115,7 +107,7 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 					contextLogger.Debug("parsing result")
 					resultTables := *results.Tables
 
-					if resultTables != nil && len(resultTables) == 1 {
+					if len(resultTables) == 1 {
 						for _, v := range *resultTables[0].Rows {
 							resultTotalRecords++
 							resultRow := map[string]interface{}{}
@@ -126,7 +118,7 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 
 							for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
 								// inject workspaceId
-								for num, _ := range metric {
+								for num := range metric {
 									metric[num].Labels["workspaceId"] = workspaceId
 								}
 
@@ -188,10 +180,6 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 func respondDecorator() autorest.RespondDecorator {
 	return func(p autorest.Responder) autorest.Responder {
 		return autorest.ResponderFunc(func(r *http.Response) error {
-			ratelimit := r.Header.Get("x-ms-user-quota-remaining")
-			if v, err := strconv.ParseInt(ratelimit, 10, 64); err == nil {
-				prometheusRateLimit.WithLabelValues().Set(float64(v))
-			}
 			return nil
 		})
 	}
