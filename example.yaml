@@ -1,0 +1,14 @@
+queries:
+
+    # name of metric
+  - metric: azure_loganalytics_operationstatus_count
+
+    # Azure ResourceGraph query
+    query: |-
+      Operation
+      | summarize count() by OperationStatus
+    timespan: PT24H
+    fields:
+      -
+        name: count_
+        type: value
