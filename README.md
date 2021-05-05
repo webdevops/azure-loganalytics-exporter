@@ -49,13 +49,15 @@ Global metrics
 
 | Metric                               | Description                                                                    |
 |--------------------------------------|--------------------------------------------------------------------------------|
-| `azure_loganalytics_query_time`     | Summary metric about query execution time (incl. all subqueries)               |
-| `azure_loganalytics_query_results`  | Number of results from query                                                   |
-| `azure_loganalytics_query_requests` | Count of requests (eg paged subqueries) per query                              |
+| `azure_loganalytics_query_time`      | Summary metric about query execution time (incl. all subqueries)               |
+| `azure_loganalytics_query_results`   | Number of results from query                                                   |
+| `azure_loganalytics_query_requests`  | Count of requests (eg paged subqueries) per query                              |
 
 
 Example
 -------
+
+for examples of result processing can be found within [azure-resourcegraph-expoter](https://github.com/webdevops/azure-resourcegraph-exporter) (uses same processing library)
 
 Config file:
 ```
