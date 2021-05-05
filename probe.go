@@ -107,22 +107,30 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 					contextLogger.Debug("parsing result")
 					resultTables := *results.Tables
 
-					if len(resultTables) == 1 {
-						for _, v := range *resultTables[0].Rows {
-							resultTotalRecords++
-							resultRow := map[string]interface{}{}
-
-							for colNum, colName := range *resultTables[0].Columns {
-								resultRow[to.String(colName.Name)] = v[colNum]
+					if len(resultTables) >= 1 {
+						for _, table := range resultTables {
+							if table.Rows == nil || table.Columns == nil {
+								// no results found, skip table
+								continue
 							}
 
-							for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
-								// inject workspaceId
-								for num := range metric {
-									metric[num].Labels["workspaceId"] = workspaceId
+							for _, v := range *table.Rows {
+								resultTotalRecords++
+								resultRow := map[string]interface{}{}
+
+								for colNum, colName := range *resultTables[0].Columns {
+									resultRow[to.String(colName.Name)] = v[colNum]
 								}
 
-								metricList.Add(metricName, metric...)
+								for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
+									// inject workspaceId
+									for num := range metric {
+										metric[num].Labels["workspaceTable"] = to.String(table.Name)
+										metric[num].Labels["workspaceId"] = workspaceId
+									}
+
+									metricList.Add(metricName, metric...)
+								}
 							}
 						}
 					}

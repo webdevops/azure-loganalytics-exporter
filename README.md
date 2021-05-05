@@ -57,7 +57,7 @@ Global metrics
 Example
 -------
 
-for examples of result processing can be found within [azure-resourcegraph-expoter](https://github.com/webdevops/azure-resourcegraph-exporter) (uses same processing library)
+more examples of result processing can be found within [azure-resourcegraph-expoter](https://github.com/webdevops/azure-resourcegraph-exporter) (uses same processing library)
 
 Config file:
 ```
@@ -76,5 +76,5 @@ Metrics:
 ```
 # HELP azure_loganalytics_operationstatus_count azure_loganalytics_operationstatus_count
 # TYPE azure_loganalytics_operationstatus_count gauge
-azure_loganalytics_operationstatus_count{OperationStatus="Succeeded",workspaceId="xxxxx-xxxx-xxxx-xxxx-xxxxxxxxx"} 1
+azure_loganalytics_operationstatus_count{OperationStatus="Succeeded",workspaceId="xxxxx-xxxx-xxxx-xxxx-xxxxxxxxx",workspaceTable="PrimaryResult"} 1
 ```
