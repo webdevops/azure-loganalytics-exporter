@@ -54,8 +54,12 @@ Global metrics
 | `azure_loganalytics_query_requests`  | Count of requests (eg paged subqueries) per query                              |
 
 
-Example
--------
+Examples
+--------
+
+see [example.yaml](example.yaml) for general ingestion metrics (number of rows per second and number of bytes per second per table)
+
+see [example.aks.yaml](example.aks.yaml) for AKS namespace ingestion metrics (number of rows per second and number of bytes per AKS namespace)
 
 more examples of result processing can be found within [azure-resourcegraph-expoter](https://github.com/webdevops/azure-resourcegraph-exporter) (uses same processing library)
 

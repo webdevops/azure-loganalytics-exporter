@@ -1,14 +1,38 @@
 queries:
-
-    # name of metric
-  - metric: azure_loganalytics_operationstatus_count
-
-    # Azure ResourceGraph query
+  #########################################################
+  ## rows metric for tables (per second)
+  - metric: azure_metrics_loganalytics_ingestion_overall_rows
     query: |-
-      Operation
-      | summarize count() by OperationStatus
-    timespan: PT24H
+      union withsource=sourceTable *
+      | project sourceTable
+      | summarize count_ = count() by sourceTable
+      | project sourceTable, count_ = (todouble(count_) / 3600)
+    timespan: PT1H
     fields:
+      -
+        name: sourceTable
+        type: id
       -
         name: count_
         type: value
+    defaultField:
+      type: ignore
+
+  #########################################################
+  ## bytes metric for tables (per second)
+  - metric: azure_metrics_loganalytics_ingestion_overall_bytes
+    query: |-
+      union withsource=sourceTable *
+      | where _IsBillable == true
+      | summarize count_ = sum(_BilledSize) by sourceTable
+      | project sourceTable, count_ = (todouble(count_) / 3600)
+    timespan: PT1H
+    fields:
+      -
+        name: sourceTable
+        type: id
+      -
+        name: count_
+        type: value
+    defaultField:
+      type: ignore

@@ -1,0 +1,48 @@
+queries:
+  #########################################################
+  ## rows metric for tables (per second)
+  - metric: azure_metrics_loganalytics_ingestion_aks_rows
+    query: |-
+      ContainerLog
+      | join kind = inner (KubePodInventory
+          | project ContainerID, PodName=Name, ControllerKind, ControllerName, Namespace
+          | distinct *
+      ) on ContainerID
+      | project Namespace
+      | summarize count_ = count() by Namespace
+      | project Namespace, count_ = (todouble(count_) / 3600)
+    timespan: PT1H
+    fields:
+      -
+        name: Namespace
+        target: sourceNamespace
+        type: id
+      -
+        name: count_
+        type: value
+    defaultField:
+      type: ignore
+
+  #########################################################
+  ## bytes metric for tables (per second)
+  - metric: azure_metrics_loganalytics_ingestion_aks_bytes
+    query: |-
+      ContainerLog
+      | where _IsBillable == true
+      | join kind = inner (KubePodInventory
+          | project ContainerID, PodName=Name, ControllerKind, ControllerName, Namespace
+          | distinct *
+      ) on ContainerID
+      | summarize count_ = sum(_BilledSize) by  Namespace
+      | project Namespace, count_ = (todouble(count_) / 3600)
+    timespan: PT1H
+    fields:
+      -
+        name: Namespace
+        target: sourceNamespace
+        type: id
+      -
+        name: count_
+        type: value
+    defaultField:
+      type: ignore
