@@ -126,7 +126,7 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 									// inject workspaceId
 									for num := range metric {
 										metric[num].Labels["workspaceTable"] = to.String(table.Name)
-										metric[num].Labels["workspaceId"] = workspaceId
+										metric[num].Labels["workspaceID"] = workspaceId
 									}
 
 									metricList.Add(metricName, metric...)
