@@ -89,6 +89,8 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 
 			resultTotalRecords := 0
 			for _, workspaceId := range opts.Loganalytics.Workspace {
+				workspaceLogger := contextLogger.WithField("workspaceId", workspaceId)
+
 				// Set options
 				workspaces := []string{}
 				queryBody := operationalinsights.QueryBody{
@@ -135,9 +137,9 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 
-					contextLogger.Debug("metrics parsed")
+					workspaceLogger.Debug("metrics parsed")
 				} else {
-					contextLogger.Errorln(queryErr.Error())
+					workspaceLogger.Errorln(queryErr.Error())
 					http.Error(w, queryErr.Error(), http.StatusBadRequest)
 					return
 				}
