@@ -20,7 +20,7 @@ type (
 		}
 
 		Loganalytics struct {
-			Workspace []string `long:"loganalytics.workspace"   env:"LOGANALYTICS_WORKSPACE"  delim:" " description:"Loganalytics workspace IDs" required:"true"`
+			Workspace []string `long:"loganalytics.workspace"   env:"LOGANALYTICS_WORKSPACE"  env-delim:" " description:"Loganalytics workspace IDs" required:"true"`
 		}
 
 		// config
