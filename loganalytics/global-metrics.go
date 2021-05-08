@@ -1,4 +1,4 @@
-package main
+package loganalytics
 
 import "github.com/prometheus/client_golang/prometheus"
 
@@ -8,7 +8,7 @@ var (
 	prometheusQueryRequests *prometheus.CounterVec
 )
 
-func initGlobalMetrics() {
+func InitGlobalMetrics() {
 	prometheusQueryTime = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name: "azure_loganalytics_query_time",

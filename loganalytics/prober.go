@@ -1,17 +1,18 @@
-package main
+package loganalytics
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	operationalinsightsProfile "github.com/Azure/azure-sdk-for-go/profiles/latest/operationalinsights/mgmt/operationalinsights"
 	"github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
+	"github.com/webdevops/azure-loganalytics-exporter/config"
 	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
 	"net/http"
 	"strconv"
@@ -19,11 +20,20 @@ import (
 )
 
 const (
-	OPINSIGHTS_URL_SUFFIX = "/v1"
+	OperationInsightsWorkspaceUrlSuffix = "/v1"
 )
 
 type (
 	LogAnalyticsProber struct {
+		QueryConfig kusto.Config
+		Conf        config.Opts
+
+		Azure struct {
+			Environment          azure.Environment
+			OpInsightsAuthorizer autorest.Authorizer
+			AzureAuthorizer      autorest.Authorizer
+		}
+
 		workspaceList []string
 
 		request  *http.Request
@@ -46,11 +56,6 @@ type (
 		}
 
 		ServiceDiscovery LogAnalyticsServiceDiscovery
-	}
-
-	LogAnalyticsServiceDiscovery struct {
-		enabled bool
-		prober  *LogAnalyticsProber
 	}
 
 	LogAnalyticsProbeResult struct {
@@ -126,8 +131,8 @@ func (p *LogAnalyticsProber) AddWorkspaces(workspace ...string) {
 
 func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.QueryClient {
 	// Create and authorize a operationalinsights client
-	client := operationalinsights.NewQueryClientWithBaseURI(AzureEnvironment.ResourceIdentifiers.OperationalInsights + OPINSIGHTS_URL_SUFFIX)
-	client.Authorizer = OpInsightsAuthorizer
+	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
+	client.Authorizer = p.Azure.OpInsightsAuthorizer
 	client.ResponseInspector = p.respondDecorator(nil)
 	return client
 }
@@ -138,7 +143,7 @@ func (p *LogAnalyticsProber) Run() {
 	// check if value is cached
 	executeQuery := true
 	if p.cache != nil && p.config.cacheEnabled {
-		if v, ok := metricCache.Get(*p.config.cacheKey); ok {
+		if v, ok := p.cache.Get(*p.config.cacheKey); ok {
 			if cacheData, ok := v.([]byte); ok {
 				if err := json.Unmarshal(cacheData, &p.metricList); err == nil {
 					p.logger.Debug("fetched from cache")
@@ -165,7 +170,7 @@ func (p *LogAnalyticsProber) Run() {
 			p.logger.Debug("saving metrics to cache")
 			if cacheData, err := json.Marshal(p.metricList); err == nil {
 				p.response.Header().Add("X-metrics-cached-until", time.Now().Add(*p.config.cacheDuration).Format(time.RFC3339))
-				metricCache.Set(*p.config.cacheKey, cacheData, *p.config.cacheDuration)
+				p.cache.Set(*p.config.cacheKey, cacheData, *p.config.cacheDuration)
 				p.logger.Debugf("saved metric to cache for %s", p.config.cacheDuration.String())
 			}
 		}
@@ -197,7 +202,7 @@ func (p *LogAnalyticsProber) Run() {
 func (p *LogAnalyticsProber) executeQueries() {
 	queryClient := p.LogAnalyticsQueryClient()
 
-	for _, queryRow := range Config.Queries {
+	for _, queryRow := range p.QueryConfig.Queries {
 		queryConfig := queryRow
 
 		// check if query matches module name
@@ -342,7 +347,7 @@ func (p *LogAnalyticsProber) parseCacheTime(r *http.Request) (time.Duration, err
 }
 
 func (p *LogAnalyticsProber) NewSizedWaitGroup() sizedwaitgroup.SizedWaitGroup {
-	size := opts.Loganalytics.Parallel
+	size := p.Conf.Loganalytics.Parallel
 
 	parallelString := p.request.URL.Query().Get("parallel")
 	if parallelString != "" {
@@ -352,47 +357,4 @@ func (p *LogAnalyticsProber) NewSizedWaitGroup() sizedwaitgroup.SizedWaitGroup {
 	}
 
 	return sizedwaitgroup.New(size)
-}
-
-func (sd *LogAnalyticsServiceDiscovery) ResourcesClient(subscriptionId string) *operationalinsightsProfile.WorkspacesClient {
-	client := operationalinsightsProfile.NewWorkspacesClientWithBaseURI(AzureEnvironment.ResourceManagerEndpoint, subscriptionId)
-	client.Authorizer = AzureAuthorizer
-	client.ResponseInspector = sd.prober.respondDecorator(&subscriptionId)
-
-	return &client
-}
-
-func (sd *LogAnalyticsServiceDiscovery) Use() {
-	sd.enabled = true
-}
-func (sd *LogAnalyticsServiceDiscovery) Find() {
-	contextLogger := sd.prober.logger.WithFields(log.Fields{
-		"type": "servicediscovery",
-	})
-
-	contextLogger.Debug("requesting list for workspaces via Azure API")
-
-	params := sd.prober.request.URL.Query()
-
-	subscriptionList, _ := paramsGetList(params, "subscription")
-	for _, subscriptionId := range subscriptionList {
-		subscriptionLogger := contextLogger.WithFields(log.Fields{
-			"subscription": subscriptionId,
-		})
-
-		list, err := sd.ResourcesClient(subscriptionId).List(sd.prober.ctx)
-		if err != nil {
-			subscriptionLogger.Error(err)
-			panic(LogAnalyticsPanicStop{Message: err.Error()})
-		}
-
-		for _, val := range *list.Value {
-			if val.CustomerID != nil {
-				sd.prober.workspaceList = append(
-					sd.prober.workspaceList,
-					to.String(val.CustomerID),
-				)
-			}
-		}
-	}
 }

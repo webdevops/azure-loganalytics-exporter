@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/azure-loganalytics-exporter/config"
+	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
 	"net/http"
 	"os"
@@ -45,7 +46,7 @@ func main() {
 
 	log.Infof("starting azure-loganalytics-exporter v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
 	log.Info(string(opts.GetJson()))
-	initGlobalMetrics()
+	loganalytics.InitGlobalMetrics()
 
 	metricCache = cache.New(120*time.Second, 60*time.Second)
 
