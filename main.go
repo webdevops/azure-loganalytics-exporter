@@ -29,6 +29,7 @@ var (
 
 	Config kusto.Config
 
+	AzureAuthorizer      autorest.Authorizer
 	OpInsightsAuthorizer autorest.Authorizer
 	AzureEnvironment     azure.Environment
 
@@ -123,6 +124,12 @@ func initAzureConnection() {
 		log.Panic(err)
 	}
 
+	// setup azure authorizer
+	AzureAuthorizer, err = auth.NewAuthorizerFromEnvironment()
+	if err != nil {
+		log.Panic(err)
+	}
+
 	OpInsightsAuthorizer, err = auth.NewAuthorizerFromEnvironmentWithResource(AzureEnvironment.ResourceIdentifiers.OperationalInsights)
 	if err != nil {
 		log.Panic(err)
@@ -134,6 +141,8 @@ func startHttpServer() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	http.HandleFunc("/probe", handleProbeRequest)
+	http.HandleFunc("/probe/workspace", handleProbeWorkspace)
+	http.HandleFunc("/probe/subscription", handleProbeSubscriptionRequest)
 
 	log.Fatal(http.ListenAndServe(opts.ServerBind, nil))
 }

@@ -16,7 +16,7 @@ type (
 
 		// azure
 		Azure struct {
-			Environment *string `long:"azure-environment"            env:"AZURE_ENVIRONMENT"                description:"Azure environment name" default:"AZUREPUBLICCLOUD"`
+			Environment *string `long:"azure.environment"            env:"AZURE_ENVIRONMENT"                description:"Azure environment name" default:"AZUREPUBLICCLOUD"`
 		}
 
 		Loganalytics struct {

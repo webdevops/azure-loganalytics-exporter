@@ -5,7 +5,7 @@ Azure LogAnalytics exporter
 [![DockerHub](https://img.shields.io/badge/DockerHub-webdevops%2Fazure--loganalytics--exporter-blue)](https://hub.docker.com/r/webdevops/azure-loganalytics-exporter/)
 [![Quay.io](https://img.shields.io/badge/Quay.io-webdevops%2Fazure--loganalytics--exporter-blue)](https://quay.io/repository/webdevops/azure-loganalytics-exporter)
 
-Prometheus exporter for Azure LogAnalytics kusto queries with configurable fields and transformations.
+Prometheus exporter for Azure LogAnalytics Kusto queries with configurable fields and transformations.
 
 Usage
 -----
@@ -18,8 +18,10 @@ Application Options:
       --debug                   debug mode [$DEBUG]
   -v, --verbose                 verbose mode [$VERBOSE]
       --log.json                Switch log output to json format [$LOG_JSON]
-      --azure-environment=      Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
+      --azure.environment=      Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
       --loganalytics.workspace= Loganalytics workspace IDs [$LOGANALYTICS_WORKSPACE]
+      --loganalytics.parallel=  Specifies how many workspaces should be queried in parallel (default: 5)
+                                [$LOGANALYTICS_PARALLEL]
   -c, --config=                 Config path [$CONFIG]
       --bind=                   Server address (default: :8080) [$SERVER_BIND]
 
@@ -40,12 +42,42 @@ HTTP Endpoints
 | Endpoint                       | Description                                                                         |
 |--------------------------------|-------------------------------------------------------------------------------------|
 | `/metrics`                     | Default prometheus golang metrics                                                   |
-| `/probe`                       | Execute loganalytics queries without set module name                               |
-| `/probe?module=xzy`            | Execute loganalytics queries for module `xzy`                                      |
-| `/probe?module=xzy&cache=2m`   | Execute loganalytics queries for module `xzy` and enable caching for 2 minutes     |
+| `/probe`                       | Execute loganalytics queries against workspaces (set on commandline/env var)        |
+| `/probe/workspace`             | Execute loganalytics queries against workspaces (defined as parameter)              |
+| `/probe/subscription`          | Execute loganalytics queries against workspaces (using servicediscovery)            |
+
+HINT: parameters of type `multiple` can be either specified multiple times and/or splits multiple values by comma.
+
+#### /probe parameters
+
+| GET parameter          | Default                   | Required | Multiple | Description                                                          |
+|------------------------|---------------------------|----------|----------|----------------------------------------------------------------------|
+| `module`               |                           | no       | no       | Filter queries by module name                                        |
+| `cache`                |                           | no       | no       | Use of internal metrics caching (time.Duration)                      |
+| `parallel`             | `$LOGANALYTICS_PARALLEL`  | no       | no       | Number (int) of how many workspaces can be queried at the same time  |
+
+#### /probe/workspace parameters
+
+| GET parameter          | Default                   | Required | Multiple | Description                                                          |
+|------------------------|---------------------------|----------|----------|----------------------------------------------------------------------|
+| `module`               |                           | no       | no       | Filter queries by module name                                        |
+| `workspace`            |                           | **yes**  | yes      | Workspace IDs which are probed                                       |
+| `cache`                |                           | no       | no       | Use of internal metrics caching (time.Duration)                      |
+| `parallel`             | `$LOGANALYTICS_PARALLEL`  | no       | no       | Number (int) of how many workspaces can be queried at the same time  |
+
+#### /probe/subscription parameters
+
+| GET parameter          | Default                   | Required | Multiple | Description                                                          |
+|------------------------|---------------------------|----------|----------|----------------------------------------------------------------------|
+| `module`               |                           | no       | no       | Filter queries by module name                                        |
+| `subscription`         |                           | **yes**  | yes      | Uses all workspaces inside subscription                              |
+| `cache`                |                           | no       | no       | Use of internal metrics caching (time.Duration)                      |
+| `parallel`             | `$LOGANALYTICS_PARALLEL`  | no       | no       | Number (int) of how many workspaces can be queried at the same time  |
 
 Global metrics
 --------------
+
+available on `/metrics`
 
 | Metric                               | Description                                                                    |
 |--------------------------------------|--------------------------------------------------------------------------------|

@@ -1,16 +1,25 @@
 package main
 
 import (
-	"github.com/remeh/sizedwaitgroup"
-	"net/http"
-	"sync"
+	"fmt"
+	"net/url"
+	"strings"
 )
 
-func NewWaitGroup() sync.WaitGroup {
-	return sync.WaitGroup{}
+func paramsGetList(params url.Values, name string) (list []string, err error) {
+	for _, v := range params[name] {
+		list = append(list, strings.Split(v, ",")...)
+	}
+	return
 }
 
-func NewWaitGroupWithSize(r *http.Request) sizedwaitgroup.SizedWaitGroup {
-	size := opts.Loganalytics.Parallel
-	return sizedwaitgroup.New(size)
+func paramsGetListRequired(params url.Values, name string) (list []string, err error) {
+	list, err = paramsGetList(params, name)
+
+	if len(list) == 0 {
+		err = fmt.Errorf("parameter \"%v\" is missing", name)
+		return
+	}
+
+	return
 }
