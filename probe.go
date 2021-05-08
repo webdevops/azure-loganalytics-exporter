@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	operationalinsights "github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -15,11 +12,15 @@ import (
 	"time"
 )
 
-const (
-	OPINSIGHTS_URL_SUFFIX = "/v1"
-)
-
 func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf(fmt.Sprintf("%v", r))
+			http.Error(w, fmt.Sprintf("%v", r), http.StatusBadRequest)
+			return
+		}
+	}()
+
 	registry := prometheus.NewRegistry()
 
 	requestTime := time.Now()
@@ -42,11 +43,7 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-
-	// Create and authorize a operationalinsights client
-	queryClient := operationalinsights.NewQueryClientWithBaseURI(AzureEnvironment.ResourceIdentifiers.OperationalInsights + OPINSIGHTS_URL_SUFFIX)
-	queryClient.Authorizer = OpInsightsAuthorizer
-	queryClient.ResponseInspector = respondDecorator()
+	queryClient := NewLoganalyticsQueryClient()
 
 	metricList := kusto.MetricList{}
 	metricList.Init()
@@ -69,7 +66,9 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 
 	if executeQuery {
 		w.Header().Add("X-metrics-cached", "false")
-		for _, queryConfig := range Config.Queries {
+		for _, queryRow := range Config.Queries {
+			queryConfig := queryRow
+
 			// check if query matches module name
 			if queryConfig.Module != moduleName {
 				continue
@@ -88,62 +87,45 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 			contextLogger.Debug("starting query")
 
 			resultTotalRecords := 0
-			for _, workspaceId := range opts.Loganalytics.Workspace {
-				workspaceLogger := contextLogger.WithField("workspaceId", workspaceId)
 
-				// Set options
-				workspaces := []string{}
-				queryBody := operationalinsights.QueryBody{
-					Query:      &queryConfig.Query,
-					Timespan:   queryConfig.Timespan,
-					Workspaces: &workspaces,
+			resultChannel := make(chan probeResult)
+			wgProbes := NewWaitGroupWithSize(r)
+			wgProcess := NewWaitGroup()
+
+			// collect metrics
+			wgProcess.Add(1)
+			go func() {
+				defer wgProcess.Done()
+				for result := range resultChannel {
+					resultTotalRecords++
+					metricList.Add(result.Name, result.Metrics...)
 				}
+			}()
 
+			// query workspaces
+			for _, row := range opts.Loganalytics.Workspace {
+				workspaceId := row
 				// Run the query and get the results
 				prometheusQueryRequests.With(prometheus.Labels{"workspace": workspaceId, "module": moduleName, "metric": queryConfig.Metric}).Inc()
 
-				var results, queryErr = queryClient.Execute(ctx, workspaceId, queryBody)
-				resultTotalRecords = 1
-
-				if queryErr == nil {
-					contextLogger.Debug("parsing result")
-					resultTables := *results.Tables
-
-					if len(resultTables) >= 1 {
-						for _, table := range resultTables {
-							if table.Rows == nil || table.Columns == nil {
-								// no results found, skip table
-								continue
-							}
-
-							for _, v := range *table.Rows {
-								resultTotalRecords++
-								resultRow := map[string]interface{}{}
-
-								for colNum, colName := range *resultTables[0].Columns {
-									resultRow[to.String(colName.Name)] = v[colNum]
-								}
-
-								for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
-									// inject workspaceId
-									for num := range metric {
-										metric[num].Labels["workspaceTable"] = to.String(table.Name)
-										metric[num].Labels["workspaceID"] = workspaceId
-									}
-
-									metricList.Add(metricName, metric...)
-								}
-							}
-						}
-					}
-
-					workspaceLogger.Debug("metrics parsed")
-				} else {
-					workspaceLogger.Errorln(queryErr.Error())
-					http.Error(w, queryErr.Error(), http.StatusBadRequest)
-					return
-				}
+				wgProbes.Add()
+				go func() {
+					defer wgProbes.Done()
+					SendQueryToLoganalyticsWorkspace(
+						ctx,
+						contextLogger,
+						workspaceId,
+						queryClient,
+						queryConfig,
+						resultChannel,
+					)
+				}()
 			}
+
+			// wait until queries are done for closing channel and waiting for result process
+			wgProbes.Wait()
+			close(resultChannel)
+			wgProcess.Wait()
 
 			elapsedTime := time.Since(startTime)
 			contextLogger.WithField("results", resultTotalRecords).Debugf("fetched %v results", resultTotalRecords)
@@ -185,12 +167,4 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	h.ServeHTTP(w, r)
-}
-
-func respondDecorator() autorest.RespondDecorator {
-	return func(p autorest.Responder) autorest.Responder {
-		return autorest.ResponderFunc(func(r *http.Response) error {
-			return nil
-		})
-	}
 }

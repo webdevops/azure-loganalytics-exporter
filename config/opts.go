@@ -21,6 +21,7 @@ type (
 
 		Loganalytics struct {
 			Workspace []string `long:"loganalytics.workspace"   env:"LOGANALYTICS_WORKSPACE"  env-delim:" " description:"Loganalytics workspace IDs" required:"true"`
+			Parallel  int      `long:"loganalytics.parallel"   env:"LOGANALYTICS_PARALLEL"                        description:"Specifies how many workspaces should be queried in parallel" default:"5"`
 		}
 
 		// config
