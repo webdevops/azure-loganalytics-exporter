@@ -127,3 +127,53 @@ Metrics:
 # TYPE azure_loganalytics_operationstatus_count gauge
 azure_loganalytics_operationstatus_count{OperationStatus="Succeeded",workspaceId="xxxxx-xxxx-xxxx-xxxx-xxxxxxxxx",workspaceTable="PrimaryResult"} 1
 ```
+
+Prometheus configuration
+------------------------
+
+predefined workspaces (at startup via parameter/environment variable)
+
+```yaml
+- job_name: azure-loganalytics-exporter
+  scrape_interval: 1m
+  metrics_path: /probe
+  params:
+    cache: ["10m"]
+    parallel: ["5"]
+  static_configs:
+  - targets: ["azure-loganalytics-exporter:8080"]
+```
+
+dynamic workspaces (defined in prometheus configuration)
+
+```yaml
+- job_name: azure-loganalytics-exporter
+  scrape_interval: 1m
+  metrics_path: /probe/workspace
+  params:
+    workspace:
+      - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+      - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+      - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+    cache: ["10m"]
+    parallel: ["5"]
+  static_configs:
+  - targets: ["azure-loganalytics-exporter:8080"]
+```
+
+find workspaces with servicediscovery via subscription
+
+```yaml
+- job_name: azure-loganalytics-exporter
+  scrape_interval: 1m
+  metrics_path: /probe/subscription
+  params:
+    subscription:
+      - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+      - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+      - xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+    cache: ["10m"]
+    parallel: ["5"]
+  static_configs:
+  - targets: ["azure-loganalytics-exporter:8080"]
+```
