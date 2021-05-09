@@ -52,7 +52,6 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 			"sd:%x",
 			string(sha1.New().Sum([]byte(fmt.Sprintf("%v", subscriptionList)))),
 		)
-		fmt.Println(cacheKey)
 	}
 
 	// try cache
