@@ -1,9 +1,13 @@
 package loganalytics
 
 import (
+	"crypto/sha1"
+	"encoding/json"
+	"fmt"
 	operationalinsightsProfile "github.com/Azure/azure-sdk-for-go/profiles/latest/operationalinsights/mgmt/operationalinsights"
 	"github.com/Azure/go-autorest/autorest/to"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 type (
@@ -14,9 +18,11 @@ type (
 )
 
 func (sd *LogAnalyticsServiceDiscovery) ResourcesClient(subscriptionId string) *operationalinsightsProfile.WorkspacesClient {
-	client := operationalinsightsProfile.NewWorkspacesClientWithBaseURI(sd.prober.Azure.Environment.ResourceManagerEndpoint, subscriptionId)
-	client.Authorizer = sd.prober.Azure.AzureAuthorizer
-	client.ResponseInspector = sd.prober.respondDecorator(&subscriptionId)
+	prober := sd.prober
+
+	client := operationalinsightsProfile.NewWorkspacesClientWithBaseURI(prober.Azure.Environment.ResourceManagerEndpoint, subscriptionId)
+	client.Authorizer = prober.Azure.AzureAuthorizer
+	client.ResponseInspector = prober.respondDecorator(&subscriptionId)
 
 	return &client
 }
@@ -25,12 +31,14 @@ func (sd *LogAnalyticsServiceDiscovery) Use() {
 	sd.enabled = true
 }
 
-func (sd *LogAnalyticsServiceDiscovery) Find() {
-	contextLogger := sd.prober.logger
+func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
+	var serviceDiscoveryCacheDuration *time.Duration
+	cacheKey := ""
+	prober := sd.prober
 
-	contextLogger.Debug("requesting list for workspaces via Azure API")
+	contextLogger := prober.logger
 
-	params := sd.prober.request.URL.Query()
+	params := prober.request.URL.Query()
 
 	subscriptionList, err := ParamsGetListRequired(params, "subscription")
 	if err != nil {
@@ -38,12 +46,53 @@ func (sd *LogAnalyticsServiceDiscovery) Find() {
 		panic(LogAnalyticsPanicStop{Message: err.Error()})
 	}
 
+	if prober.cache != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration.Seconds() > 0 {
+		serviceDiscoveryCacheDuration = prober.Conf.Azure.ServiceDiscovery.CacheDuration
+		cacheKey = fmt.Sprintf(
+			"sd:%x",
+			string(sha1.New().Sum([]byte(fmt.Sprintf("%v", subscriptionList)))),
+		)
+		fmt.Println(cacheKey)
+	}
+
+	// try cache
+	if serviceDiscoveryCacheDuration != nil {
+		if v, ok := prober.cache.Get(cacheKey); ok {
+			if cacheData, ok := v.([]byte); ok {
+				if err := json.Unmarshal(cacheData, &prober.workspaceList); err == nil {
+					contextLogger.Debug("fetched servicediscovery from cache")
+					prober.response.Header().Add("X-servicediscovery-cached", "true")
+					return
+				} else {
+					prober.logger.Debug("unable to parse cached servicediscovery")
+				}
+			}
+		}
+	}
+
+	contextLogger.Debug("requesting list for workspaces via Azure API")
+	sd.requestWorkspacesFromAzure(contextLogger, subscriptionList)
+
+	// store to cache (if enabeld)
+	if serviceDiscoveryCacheDuration != nil {
+		contextLogger.Debug("saving servicedisccovery to cache")
+		if cacheData, err := json.Marshal(prober.workspaceList); err == nil {
+			prober.response.Header().Add("X-servicediscovery-cached-until", time.Now().Add(*serviceDiscoveryCacheDuration).Format(time.RFC3339))
+			prober.cache.Set(cacheKey, cacheData, *serviceDiscoveryCacheDuration)
+			contextLogger.Debugf("saved servicediscovery to cache for %s", serviceDiscoveryCacheDuration.String())
+		}
+	}
+}
+
+func (sd *LogAnalyticsServiceDiscovery) requestWorkspacesFromAzure(logger *log.Entry, subscriptionList []string) {
+	prober := sd.prober
+
 	for _, subscriptionId := range subscriptionList {
-		subscriptionLogger := contextLogger.WithFields(log.Fields{
+		subscriptionLogger := logger.WithFields(log.Fields{
 			"subscription": subscriptionId,
 		})
 
-		list, err := sd.ResourcesClient(subscriptionId).List(sd.prober.ctx)
+		list, err := sd.ResourcesClient(subscriptionId).List(prober.ctx)
 		if err != nil {
 			subscriptionLogger.Error(err)
 			panic(LogAnalyticsPanicStop{Message: err.Error()})
@@ -51,11 +100,12 @@ func (sd *LogAnalyticsServiceDiscovery) Find() {
 
 		for _, val := range *list.Value {
 			if val.CustomerID != nil {
-				sd.prober.workspaceList = append(
-					sd.prober.workspaceList,
+				prober.workspaceList = append(
+					prober.workspaceList,
 					to.String(val.CustomerID),
 				)
 			}
 		}
 	}
+
 }

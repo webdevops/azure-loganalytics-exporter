@@ -2,6 +2,7 @@ package loganalytics
 
 import (
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
@@ -59,9 +60,10 @@ type (
 	}
 
 	LogAnalyticsProbeResult struct {
-		Name    string
-		Metrics []kusto.MetricRow
-		Error   error
+		WorkspaceId string
+		Name        string
+		Metrics     []kusto.MetricRow
+		Error       error
 	}
 
 	LogAnalyticsPanicStop struct {
@@ -103,13 +105,12 @@ func (p *LogAnalyticsProber) Init() {
 	if cacheTime.Seconds() > 0 {
 		p.config.cacheEnabled = true
 		p.config.cacheDuration = &cacheTime
-
-		cacheKey := fmt.Sprintf(
-			"cache:%s",
-			p.request.RequestURI,
+		p.config.cacheKey = to.StringPtr(
+			fmt.Sprintf(
+				"metrics:%x",
+				string(sha1.New().Sum([]byte(p.request.RequestURI))),
+			),
 		)
-		p.config.cacheKey = &cacheKey
-		fmt.Println(*p.config.cacheKey)
 	}
 }
 
@@ -146,11 +147,11 @@ func (p *LogAnalyticsProber) Run() {
 		if v, ok := p.cache.Get(*p.config.cacheKey); ok {
 			if cacheData, ok := v.([]byte); ok {
 				if err := json.Unmarshal(cacheData, &p.metricList); err == nil {
-					p.logger.Debug("fetched from cache")
+					p.logger.Debug("fetched metrics from cache")
 					p.response.Header().Add("X-metrics-cached", "true")
 					executeQuery = false
 				} else {
-					p.logger.Debug("unable to parse cache data")
+					p.logger.Debug("unable to parse cached metrics")
 				}
 			}
 		}
@@ -160,7 +161,7 @@ func (p *LogAnalyticsProber) Run() {
 		p.response.Header().Add("X-metrics-cached", "false")
 
 		if p.ServiceDiscovery.enabled {
-			p.ServiceDiscovery.Find()
+			p.ServiceDiscovery.ServiceDiscovery()
 		}
 
 		p.executeQueries()
@@ -230,7 +231,7 @@ func (p *LogAnalyticsProber) executeQueries() {
 		for _, row := range p.workspaceList {
 			workspaceId := row
 			// Run the query and get the results
-			prometheusQueryRequests.With(prometheus.Labels{"workspace": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
+			prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
 
 			wgProbes.Add()
 			go func() {
@@ -255,9 +256,26 @@ func (p *LogAnalyticsProber) executeQueries() {
 			if result.Error == nil {
 				resultTotalRecords++
 				p.metricList.Add(result.Name, result.Metrics...)
+
+				prometheusQueryStatus.With(prometheus.Labels{
+					"module":      p.config.moduleName,
+					"metric":      queryConfig.Metric,
+					"workspaceID": result.WorkspaceId,
+				}).Set(1)
+
+				prometheusQueryLastSuccessfull.With(prometheus.Labels{
+					"module":      p.config.moduleName,
+					"metric":      queryConfig.Metric,
+					"workspaceID": result.WorkspaceId,
+				}).SetToCurrentTime()
 			} else {
+				prometheusQueryStatus.With(prometheus.Labels{
+					"module":      p.config.moduleName,
+					"metric":      queryConfig.Metric,
+					"workspaceID": result.WorkspaceId,
+				}).Set(0)
+
 				contextLogger.Error(result.Error)
-				panic(LogAnalyticsPanicStop{Message: result.Error.Error()})
 			}
 		}
 
@@ -308,8 +326,9 @@ func (p *LogAnalyticsProber) sendQueryToWorkspace(logger *log.Entry, workspaceId
 						}
 
 						result <- LogAnalyticsProbeResult{
-							Name:    metricName,
-							Metrics: metric,
+							WorkspaceId: workspaceId,
+							Name:        metricName,
+							Metrics:     metric,
 						}
 					}
 				}

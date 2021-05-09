@@ -7,6 +7,9 @@ Azure LogAnalytics exporter
 
 Prometheus exporter for Azure LogAnalytics Kusto queries with configurable fields and transformations.
 
+`azure-loganalytics-exporter` can query configured workspaces or all workspaces in one or multiple subscriptions.
+The exporter can also cache metrics and servicediscovery information to reduce requests against workspaces and Azure API.
+
 Usage
 -----
 
@@ -15,18 +18,20 @@ Usage:
   azure-loganalytics-exporter [OPTIONS]
 
 Application Options:
-      --debug                   debug mode [$DEBUG]
-  -v, --verbose                 verbose mode [$VERBOSE]
-      --log.json                Switch log output to json format [$LOG_JSON]
-      --azure.environment=      Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
-      --loganalytics.workspace= Loganalytics workspace IDs [$LOGANALYTICS_WORKSPACE]
-      --loganalytics.parallel=  Specifies how many workspaces should be queried in parallel (default: 5)
-                                [$LOGANALYTICS_PARALLEL]
-  -c, --config=                 Config path [$CONFIG]
-      --bind=                   Server address (default: :8080) [$SERVER_BIND]
+      --debug                         debug mode [$DEBUG]
+  -v, --verbose                       verbose mode [$VERBOSE]
+      --log.json                      Switch log output to json format [$LOG_JSON]
+      --azure.environment=            Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
+      --azure.servicediscovery.cache= Duration for caching Azure ServiceDiscovery of workspaces to reduce API
+                                      calls (time.Duration) (default: 30m) [$AZURE_SERVICEDISCOVERY_CACHE]
+      --loganalytics.workspace=       Loganalytics workspace IDs [$LOGANALYTICS_WORKSPACE]
+      --loganalytics.parallel=        Specifies how many workspaces should be queried in parallel (default: 5)
+                                      [$LOGANALYTICS_PARALLEL]
+  -c, --config=                       Config path [$CONFIG]
+      --bind=                         Server address (default: :8080) [$SERVER_BIND]
 
 Help Options:
-  -h, --help                    Show this help message
+  -h, --help                          Show this help message
 ```
 
 for Azure API authentication (using ENV vars) see https://github.com/Azure/azure-sdk-for-go#authentication
@@ -50,6 +55,8 @@ HINT: parameters of type `multiple` can be either specified multiple times and/o
 
 #### /probe parameters
 
+uses predefined workspace list defined as parameter/environment variable on startup
+
 | GET parameter          | Default                   | Required | Multiple | Description                                                          |
 |------------------------|---------------------------|----------|----------|----------------------------------------------------------------------|
 | `module`               |                           | no       | no       | Filter queries by module name                                        |
@@ -57,6 +64,8 @@ HINT: parameters of type `multiple` can be either specified multiple times and/o
 | `parallel`             | `$LOGANALYTICS_PARALLEL`  | no       | no       | Number (int) of how many workspaces can be queried at the same time  |
 
 #### /probe/workspace parameters
+
+uses dynamically passed workspaces via HTTP query parameter
 
 | GET parameter          | Default                   | Required | Multiple | Description                                                          |
 |------------------------|---------------------------|----------|----------|----------------------------------------------------------------------|
@@ -66,6 +75,8 @@ HINT: parameters of type `multiple` can be either specified multiple times and/o
 | `parallel`             | `$LOGANALYTICS_PARALLEL`  | no       | no       | Number (int) of how many workspaces can be queried at the same time  |
 
 #### /probe/subscription parameters
+
+uses Azure service discovery to find all workspaces in one or multiple subscriptions
 
 | GET parameter          | Default                   | Required | Multiple | Description                                                          |
 |------------------------|---------------------------|----------|----------|----------------------------------------------------------------------|
@@ -79,11 +90,13 @@ Global metrics
 
 available on `/metrics`
 
-| Metric                               | Description                                                                    |
-|--------------------------------------|--------------------------------------------------------------------------------|
-| `azure_loganalytics_query_time`      | Summary metric about query execution time (incl. all subqueries)               |
-| `azure_loganalytics_query_results`   | Number of results from query                                                   |
-| `azure_loganalytics_query_requests`  | Count of requests (eg paged subqueries) per query                              |
+| Metric                                      | Description                                                                    |
+|---------------------------------------------|--------------------------------------------------------------------------------|
+| `azure_loganalytics_status`                 | Status if query was successfull (per workspace, module, metric)                |
+| `azure_loganalytics_last_query_successfull` | Timestamp of last successfull query (per workspace, module, metric)            |
+| `azure_loganalytics_query_time`             | Summary metric about query execution time (incl. all subqueries)               |
+| `azure_loganalytics_query_results`          | Number of results from query                                                   |
+| `azure_loganalytics_query_requests`         | Count of requests (eg paged subqueries) per query                              |
 
 
 Examples

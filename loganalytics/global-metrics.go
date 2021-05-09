@@ -3,9 +3,11 @@ package loganalytics
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	prometheusQueryTime     *prometheus.SummaryVec
-	prometheusQueryResults  *prometheus.GaugeVec
-	prometheusQueryRequests *prometheus.CounterVec
+	prometheusQueryTime            *prometheus.SummaryVec
+	prometheusQueryResults         *prometheus.GaugeVec
+	prometheusQueryRequests        *prometheus.CounterVec
+	prometheusQueryStatus          *prometheus.GaugeVec
+	prometheusQueryLastSuccessfull *prometheus.GaugeVec
 )
 
 func InitGlobalMetrics() {
@@ -39,10 +41,36 @@ func InitGlobalMetrics() {
 			Help: "Azure loganalytics query request count",
 		},
 		[]string{
-			"workspace",
+			"workspaceID",
 			"module",
 			"metric",
 		},
 	)
 	prometheus.MustRegister(prometheusQueryRequests)
+
+	prometheusQueryStatus = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azure_loganalytics_status",
+			Help: "Azure loganalytics workspace status",
+		},
+		[]string{
+			"workspaceID",
+			"module",
+			"metric",
+		},
+	)
+	prometheus.MustRegister(prometheusQueryStatus)
+
+	prometheusQueryLastSuccessfull = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azure_loganalytics_last_query_successfull",
+			Help: "Azure loganalytics workspace last successfull scrape time",
+		},
+		[]string{
+			"workspaceID",
+			"module",
+			"metric",
+		},
+	)
+	prometheus.MustRegister(prometheusQueryLastSuccessfull)
 }
