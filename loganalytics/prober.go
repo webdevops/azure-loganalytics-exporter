@@ -228,25 +228,25 @@ func (p *LogAnalyticsProber) executeQueries() {
 		wgProbes := p.NewSizedWaitGroup()
 
 		// query workspaces
-		for _, row := range p.workspaceList {
-			workspaceId := row
-			// Run the query and get the results
-			prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
-
-			wgProbes.Add()
-			go func() {
-				defer wgProbes.Done()
-				p.sendQueryToWorkspace(
-					contextLogger,
-					workspaceId,
-					queryClient,
-					queryConfig,
-					resultChannel,
-				)
-			}()
-		}
-
 		go func() {
+			for _, row := range p.workspaceList {
+				workspaceId := row
+				// Run the query and get the results
+				prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
+
+				wgProbes.Add()
+				go func() {
+					defer wgProbes.Done()
+					p.sendQueryToWorkspace(
+						contextLogger,
+						workspaceId,
+						queryClient,
+						queryConfig,
+						resultChannel,
+					)
+				}()
+			}
+
 			// wait until queries are done for closing channel and waiting for result process
 			wgProbes.Wait()
 			close(resultChannel)
