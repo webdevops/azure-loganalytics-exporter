@@ -233,8 +233,8 @@ github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXf
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
-github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210826200325-345c764362cc h1:QQp9aPNxKaULIiOhrCgthF8IgFc+zeK8Jy60HdtEiWc=
-github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210826200325-345c764362cc/go.mod h1:pYqS47xOioD3T7pEJ1tK+VfGPuu+kkaXOug5NQ9tPxU=
+github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210826213426-8839c50c2d93 h1:XaMzF0J7pxlYELWUQPXYK4gW6qc3zm6j4pjTfEhTsB4=
+github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210826213426-8839c50c2d93/go.mod h1:pYqS47xOioD3T7pEJ1tK+VfGPuu+kkaXOug5NQ9tPxU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
