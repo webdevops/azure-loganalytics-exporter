@@ -36,3 +36,65 @@ queries:
         type: value
     defaultField:
       type: ignore
+
+  #########################################################
+  ## ingestion latency
+  - metric: "azure_metrics_loganalytics_ingestion_latency"
+    publish: false # do not publish main metric, only sub metrics are published
+    query: |-
+      Heartbeat
+      | where TimeGenerated > ago(30m)
+      | extend E2EIngestionLatencyMin = todouble(datetime_diff("Second",ingestion_time(),TimeGenerated))/60
+      | extend AgentLatencyMin = todouble(datetime_diff("Second",_TimeReceived,TimeGenerated))/60
+      | summarize percentiles(E2EIngestionLatencyMin,50,75,95), percentiles(AgentLatencyMin,50,75,95)
+    timespan: PT30M
+    fields:
+      ## e2e ingestion latency
+      - name: type
+        type: id
+
+      - name: percentile_E2EIngestionLatencyMin_95
+        metric: azure_metrics_loganalytics_ingestion_latency
+        labels:
+          type: E2EIngestionLatencyMin
+          le: 95
+        type: value
+
+      - name: percentile_E2EIngestionLatencyMin_75
+        metric: azure_metrics_loganalytics_ingestion_latency
+        labels:
+          type: E2EIngestionLatencyMin
+          le: 75
+        type: value
+
+      - name: percentile_E2EIngestionLatencyMin_50
+        metric: azure_metrics_loganalytics_ingestion_latency
+        labels:
+          type: E2EIngestionLatencyMin
+          le: 50
+        type: value
+
+      ## agent ingestion latency
+      - name: percentile_AgentLatencyMin_95
+        metric: azure_metrics_loganalytics_ingestion_agent_latency
+        labels:
+          type: AgentLatencyMin
+          le: 95
+        type: value
+
+      - name: percentile_AgentLatencyMin_75
+        metric: azure_metrics_loganalytics_ingestion_agent_latency
+        labels:
+          type: AgentLatencyMin
+          le: 75
+        type: value
+
+      - name: percentile_AgentLatencyMin_50
+        metric: azure_metrics_loganalytics_ingestion_agent_latency
+        labels:
+          type: AgentLatencyMin
+          le: 50
+        type: value
+
+    defaultField:
+      type: ignore
