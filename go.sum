@@ -31,8 +31,8 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 cloud.google.com/go/storage v1.8.0/go.mod h1:Wv1Oy7z6Yz3DshWRJFhqM/UCfaWIRTdp0RXyy7KQOVs=
 cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9ullr3+Kg0=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-github.com/Azure/azure-sdk-for-go v56.3.0+incompatible h1:DmhwMrUIvpeoTDiWRDtNHqelNUd3Og8JCkrLHQK795c=
-github.com/Azure/azure-sdk-for-go v56.3.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
+github.com/Azure/azure-sdk-for-go v57.0.0+incompatible h1:isVki3PbIFrwKvKdVP1byxo73/pt+Nn174YxW1k4PNw=
+github.com/Azure/azure-sdk-for-go v57.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-autorest v14.2.0+incompatible h1:V5VMDjClD3GiElqLWO7mz2MxNAK/vTfRHdAubSIPRgs=
 github.com/Azure/go-autorest v14.2.0+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
 github.com/Azure/go-autorest/autorest v0.11.17/go.mod h1:eipySxLmqSyC5s5k1CLupqet0PSENBEDP93LQ9a8QYw=
@@ -233,8 +233,8 @@ github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXf
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
-github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210826213426-8839c50c2d93 h1:XaMzF0J7pxlYELWUQPXYK4gW6qc3zm6j4pjTfEhTsB4=
-github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210826213426-8839c50c2d93/go.mod h1:pYqS47xOioD3T7pEJ1tK+VfGPuu+kkaXOug5NQ9tPxU=
+github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210828132045-eb367b3180dc h1:/CsGASswNlj8jGYuwkxRCTCaiX3QVGXvebvjxN5A6eI=
+github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210828132045-eb367b3180dc/go.mod h1:+O/vB3cTYLvYmBI1R0dO4VHbsrXAn3HopLiJBvJIUx8=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
