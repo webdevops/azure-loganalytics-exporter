@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210828132045-eb367b3180dc
+	github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20210830185910-36bc29b34b66
 )
 
 require (

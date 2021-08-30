@@ -194,7 +194,9 @@ func (p *LogAnalyticsProber) Run() {
 				}
 			}
 
-			gaugeVec.With(metric.Labels).Set(metric.Value)
+			if metric.Value != nil {
+				gaugeVec.With(metric.Labels).Set(*metric.Value)
+			}
 		}
 	}
 	p.logger.WithField("duration", time.Since(requestTime).String()).Debug("finished request")
