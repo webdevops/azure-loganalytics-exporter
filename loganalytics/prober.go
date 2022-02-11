@@ -2,7 +2,7 @@ package loganalytics
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" //#nosec
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
@@ -112,7 +112,7 @@ func (p *LogAnalyticsProber) Init() {
 				"metrics:%x",
 				string(sha1.New().Sum([]byte(p.request.RequestURI))),
 			),
-		)
+		) //#nosec
 	}
 }
 
