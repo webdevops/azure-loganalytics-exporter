@@ -1,17 +1,16 @@
-Azure LogAnalytics exporter
-============================
+# Azure LogAnalytics exporter
 
 [![license](https://img.shields.io/github/license/webdevops/azure-loganalytics-exporter.svg)](https://github.com/webdevops/azure-loganalytics-exporter/blob/master/LICENSE)
 [![DockerHub](https://img.shields.io/badge/DockerHub-webdevops%2Fazure--loganalytics--exporter-blue)](https://hub.docker.com/r/webdevops/azure-loganalytics-exporter/)
 [![Quay.io](https://img.shields.io/badge/Quay.io-webdevops%2Fazure--loganalytics--exporter-blue)](https://quay.io/repository/webdevops/azure-loganalytics-exporter)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/azure-loganalytics-exporter)](https://artifacthub.io/packages/search?repo=azure-loganalytics-exporter)
 
 Prometheus exporter for Azure LogAnalytics Kusto queries with configurable fields and transformations.
 
 `azure-loganalytics-exporter` can query configured workspaces or all workspaces in one or multiple subscriptions.
 The exporter can also cache metrics and servicediscovery information to reduce requests against workspaces and Azure API.
 
-Usage
------
+## Usage
 
 ```
 Usage:
@@ -34,15 +33,13 @@ Help Options:
   -h, --help                          Show this help message
 ```
 
-for Azure API authentication (using ENV vars) see https://github.com/Azure/azure-sdk-for-go#authentication
+for Azure API authentication (using ENV vars) see https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication
 
-Configuration file
-------------------
+## Configuration file
 
 * see [example.yaml](example.yaml)
 
-HTTP Endpoints
---------------
+## HTTP Endpoints
 
 | Endpoint                       | Description                                                                         |
 |--------------------------------|-------------------------------------------------------------------------------------|
@@ -85,8 +82,7 @@ uses Azure service discovery to find all workspaces in one or multiple subscript
 | `cache`                |                           | no       | no       | Use of internal metrics caching (time.Duration)                      |
 | `parallel`             | `$LOGANALYTICS_PARALLEL`  | no       | no       | Number (int) of how many workspaces can be queried at the same time  |
 
-Global metrics
---------------
+## Global metrics
 
 available on `/metrics`
 
@@ -99,8 +95,7 @@ available on `/metrics`
 | `azure_loganalytics_query_requests`         | Count of requests (eg paged subqueries) per query                              |
 
 
-Examples
---------
+## Examples
 
 see [example.yaml](example.yaml) for general ingestion metrics (number of rows per second and number of bytes per second per table)
 
@@ -128,8 +123,7 @@ Metrics:
 azure_loganalytics_operationstatus_count{OperationStatus="Succeeded",workspaceId="xxxxx-xxxx-xxxx-xxxx-xxxxxxxxx",workspaceTable="PrimaryResult"} 1
 ```
 
-Prometheus configuration
-------------------------
+## Prometheus configuration
 
 predefined workspaces (at startup via parameter/environment variable)
 
