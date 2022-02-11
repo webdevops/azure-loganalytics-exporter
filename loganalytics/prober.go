@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/azure-loganalytics-exporter/config"
 	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
+	"github.com/webdevops/go-prometheus-common/azuretracing"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,6 +29,7 @@ type (
 	LogAnalyticsProber struct {
 		QueryConfig kusto.Config
 		Conf        config.Opts
+		UserAgent   string
 
 		Azure struct {
 			Environment          azure.Environment
@@ -133,8 +135,8 @@ func (p *LogAnalyticsProber) AddWorkspaces(workspace ...string) {
 func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.QueryClient {
 	// Create and authorize a operationalinsights client
 	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
+	p.decorateAzureAutoRest(&client.Client)
 	client.Authorizer = p.Azure.OpInsightsAuthorizer
-	client.ResponseInspector = p.respondDecorator(nil)
 	return client
 }
 
@@ -346,14 +348,6 @@ func (p *LogAnalyticsProber) sendQueryToWorkspace(logger *log.Entry, workspaceId
 	}
 }
 
-func (p *LogAnalyticsProber) respondDecorator(subscriptionId *string) autorest.RespondDecorator {
-	return func(p autorest.Responder) autorest.Responder {
-		return autorest.ResponderFunc(func(r *http.Response) error {
-			return nil
-		})
-	}
-}
-
 func (p *LogAnalyticsProber) parseCacheTime(r *http.Request) (time.Duration, error) {
 	durationString := r.URL.Query().Get("cache")
 	if durationString != "" {
@@ -378,4 +372,12 @@ func (p *LogAnalyticsProber) NewSizedWaitGroup() sizedwaitgroup.SizedWaitGroup {
 	}
 
 	return sizedwaitgroup.New(size)
+}
+
+func (p *LogAnalyticsProber) decorateAzureAutoRest(client *autorest.Client) {
+	client.Authorizer = p.Azure.AzureAuthorizer
+	if err := client.AddToUserAgent(p.UserAgent); err != nil {
+		log.Panic(err)
+	}
+	azuretracing.DecoreAzureAutoRest(client)
 }

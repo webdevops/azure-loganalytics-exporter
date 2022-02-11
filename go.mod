@@ -13,6 +13,7 @@ require (
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20220211155142-96a70b1d912f
+	github.com/webdevops/go-prometheus-common v0.0.0-20220211101814-4c9913788fe1
 )
 
 require (

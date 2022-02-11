@@ -75,6 +75,7 @@ func NewLogAnalyticsProber(w http.ResponseWriter, r *http.Request) *loganalytics
 	prober := loganalytics.NewLogAnalyticsProber(w, r)
 	prober.QueryConfig = Config
 	prober.Conf = opts
+	prober.UserAgent = UserAgent + gitTag
 	prober.Azure.AzureAuthorizer = AzureAuthorizer
 	prober.Azure.OpInsightsAuthorizer = OpInsightsAuthorizer
 	prober.Azure.Environment = AzureEnvironment

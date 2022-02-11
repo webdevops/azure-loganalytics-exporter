@@ -231,6 +231,7 @@ github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJy
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20220211155142-96a70b1d912f h1:Hbtrj8gZOSPzywrok7vxakGiM9cloDiwZApEjyNQ9Js=
 github.com/webdevops/azure-resourcegraph-exporter v0.0.0-20220211155142-96a70b1d912f/go.mod h1:7/oZePL6o+quZtWhtM97XjTh2JCEAYSPkpkx9wmNz2s=
+github.com/webdevops/go-prometheus-common v0.0.0-20220211101814-4c9913788fe1 h1:wIf6O43jGEarp8ojgInXRIt6jHeQ94JUvsy4O3wqKHY=
 github.com/webdevops/go-prometheus-common v0.0.0-20220211101814-4c9913788fe1/go.mod h1:naEkgDRh6L+Ef0qzaS9Q60m1GkwN5Mu6xaNd/Ha84Sg=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

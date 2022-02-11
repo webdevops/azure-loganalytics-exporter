@@ -12,6 +12,7 @@ import (
 	"github.com/webdevops/azure-loganalytics-exporter/config"
 	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
+	"github.com/webdevops/go-prometheus-common/azuretracing"
 	"net/http"
 	"os"
 	"path"
@@ -22,6 +23,8 @@ import (
 
 const (
 	Author = "webdevops.io"
+
+	UserAgent = "azure-loganalytics-exporter/"
 )
 
 var (
@@ -139,7 +142,14 @@ func initAzureConnection() {
 
 // start and handle prometheus handler
 func startHttpServer() {
-	http.Handle("/metrics", promhttp.Handler())
+	// healthz
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := fmt.Fprint(w, "Ok"); err != nil {
+			log.Error(err)
+		}
+	})
+
+	http.Handle("/metrics", azuretracing.RegisterAzureMetricAutoClean(promhttp.Handler()))
 
 	http.HandleFunc("/probe", handleProbeRequest)
 	http.HandleFunc("/probe/workspace", handleProbeWorkspace)

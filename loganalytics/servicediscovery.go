@@ -21,8 +21,7 @@ func (sd *LogAnalyticsServiceDiscovery) ResourcesClient(subscriptionId string) *
 	prober := sd.prober
 
 	client := operationalinsightsProfile.NewWorkspacesClientWithBaseURI(prober.Azure.Environment.ResourceManagerEndpoint, subscriptionId)
-	client.Authorizer = prober.Azure.AzureAuthorizer
-	client.ResponseInspector = prober.respondDecorator(&subscriptionId)
+	prober.decorateAzureAutoRest(&client.Client)
 
 	return &client
 }
