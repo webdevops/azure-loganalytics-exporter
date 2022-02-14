@@ -379,5 +379,5 @@ func (p *LogAnalyticsProber) decorateAzureAutoRest(client *autorest.Client) {
 	if err := client.AddToUserAgent(p.UserAgent); err != nil {
 		log.Panic(err)
 	}
-	azuretracing.DecoreAzureAutoRest(client)
+	azuretracing.DecorateAzureAutoRestClient(client)
 }
