@@ -1,0 +1,29 @@
+#################################
+# This example sends the query to every LogAnalytics workspace and fetches general information using a static workspaces list:
+#
+#  azure_metrics_loganalytics_ingestion_overall_rows: number of log lines per LogAnalytics table in 1 hour
+#
+#################################
+queries:
+  #########################################################
+  ## rows metric for tables (per second)
+  - metric: azure_metrics_loganalytics_ingestion_overall_rows
+    #queryMode: multi
+    workspaces:
+      - a70cb3ef-7783-4e54-9335-2adfc4abb42c
+      - 1b352f13-da26-422e-be38-662ec8b5cab5
+    query: |-
+      union withsource=sourceTable *
+      | project sourceTable
+      | summarize count_ = count() by sourceTable
+      | project sourceTable, count_ = (todouble(count_) / 3600)
+    timespan: PT1H
+    fields:
+      -
+        name: sourceTable
+        type: id
+      -
+        name: count_
+        type: value
+    defaultField:
+      type: ignore

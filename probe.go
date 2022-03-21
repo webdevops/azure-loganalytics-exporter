@@ -33,10 +33,6 @@ func handleProbePanic(w http.ResponseWriter, r *http.Request) {
 func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 	defer handleProbePanic(w, r)
 
-	if len(opts.Loganalytics.Workspace) == 0 {
-		panic("no workspaces defined")
-	}
-
 	prober := NewLogAnalyticsProber(w, r)
 	prober.AddWorkspaces(opts.Loganalytics.Workspace...)
 	prober.Run(w, r)

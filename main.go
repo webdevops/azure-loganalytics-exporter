@@ -17,8 +17,8 @@ import (
 	cache "github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
 	"github.com/webdevops/go-prometheus-common/azuretracing"
+	"github.com/webdevops/go-prometheus-common/kusto"
 
 	"github.com/webdevops/azure-loganalytics-exporter/config"
 	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
@@ -115,6 +115,7 @@ func initArgparser() {
 }
 
 func readConfig() {
+	log.Infof("read config %s", opts.Config.Path)
 	Config = kusto.NewConfig(opts.Config.Path)
 
 	if err := Config.Validate(); err != nil {

@@ -2,7 +2,7 @@ package loganalytics
 
 import (
 	"context"
-	"crypto/sha1" //#nosec
+	"crypto/sha1" // #nosec
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,8 +20,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
 	"github.com/webdevops/go-prometheus-common/azuretracing"
+	"github.com/webdevops/go-prometheus-common/kusto"
 
 	"github.com/webdevops/azure-loganalytics-exporter/config"
 )
@@ -117,7 +117,7 @@ func (p *LogAnalyticsProber) Init() {
 				"metrics:%x",
 				string(sha1.New().Sum([]byte(p.request.RequestURI))),
 			),
-		) //#nosec
+		) // #nosec
 	}
 }
 
@@ -223,12 +223,17 @@ func (p *LogAnalyticsProber) Run(w http.ResponseWriter, r *http.Request) {
 func (p *LogAnalyticsProber) executeQueries() error {
 	queryClient := p.LogAnalyticsQueryClient()
 
-	if len(p.workspaceList) == 0 {
-		return errors.New("no workspaces found")
-	}
-
 	for _, queryRow := range p.QueryConfig.Queries {
 		queryConfig := queryRow
+
+		workspaceList := p.workspaceList
+		if queryRow.Workspaces != nil && len(*queryRow.Workspaces) >= 1 {
+			workspaceList = *queryRow.Workspaces
+		}
+
+		if len(workspaceList) == 0 {
+			return errors.New("no workspaces found")
+		}
 
 		// check if query matches module name
 		if queryConfig.Module != p.config.moduleName {
@@ -260,14 +265,14 @@ func (p *LogAnalyticsProber) executeQueries() error {
 					defer wgProbes.Done()
 					p.sendQueryToMultipleWorkspace(
 						contextLogger,
-						p.workspaceList,
+						workspaceList,
 						queryClient,
 						queryConfig,
 						resultChannel,
 					)
 				}()
 			case "", "single":
-				for _, row := range p.workspaceList {
+				for _, row := range workspaceList {
 					workspaceId := row
 					// Run the query and get the results
 					prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
