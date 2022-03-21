@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 )
 
 func handleProbePanic(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +24,7 @@ func handleProbePanic(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, v.Error(), http.StatusBadRequest)
 		default:
 			msg := fmt.Sprintf("%v", err)
-			log.Errorf(msg)
+			log.WithField("request", r.RequestURI).Errorf(msg)
 			http.Error(w, msg, http.StatusBadRequest)
 		}
 	}
@@ -38,10 +39,7 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 
 	prober := NewLogAnalyticsProber(w, r)
 	prober.AddWorkspaces(opts.Loganalytics.Workspace...)
-	prober.Run()
-
-	h := promhttp.HandlerFor(prober.GetPrometheusRegistry(), promhttp.HandlerOpts{})
-	h.ServeHTTP(w, r)
+	prober.Run(w, r)
 }
 
 func handleProbeWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -54,10 +52,7 @@ func handleProbeWorkspace(w http.ResponseWriter, r *http.Request) {
 
 	prober := NewLogAnalyticsProber(w, r)
 	prober.AddWorkspaces(workspaceList...)
-	prober.Run()
-
-	h := promhttp.HandlerFor(prober.GetPrometheusRegistry(), promhttp.HandlerOpts{})
-	h.ServeHTTP(w, r)
+	prober.Run(w, r)
 }
 
 func handleProbeSubscriptionRequest(w http.ResponseWriter, r *http.Request) {
@@ -65,10 +60,7 @@ func handleProbeSubscriptionRequest(w http.ResponseWriter, r *http.Request) {
 
 	prober := NewLogAnalyticsProber(w, r)
 	prober.ServiceDiscovery.Use()
-	prober.Run()
-
-	h := promhttp.HandlerFor(prober.GetPrometheusRegistry(), promhttp.HandlerOpts{})
-	h.ServeHTTP(w, r)
+	prober.Run(w, r)
 }
 
 func NewLogAnalyticsProber(w http.ResponseWriter, r *http.Request) *loganalytics.LogAnalyticsProber {

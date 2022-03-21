@@ -4,21 +4,26 @@ import (
 	"context"
 	"crypto/sha1" //#nosec
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/azure-loganalytics-exporter/config"
 	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
 	"github.com/webdevops/go-prometheus-common/azuretracing"
-	"net/http"
-	"strconv"
-	"time"
+
+	"github.com/webdevops/azure-loganalytics-exporter/config"
 )
 
 const (
@@ -133,14 +138,14 @@ func (p *LogAnalyticsProber) AddWorkspaces(workspace ...string) {
 }
 
 func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.QueryClient {
-	// Create and authorize a operationalinsights client
+	// Create and authorize operationalinsights client
 	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
 	p.decorateAzureAutoRest(&client.Client)
 	client.Authorizer = p.Azure.OpInsightsAuthorizer
 	return client
 }
 
-func (p *LogAnalyticsProber) Run() {
+func (p *LogAnalyticsProber) Run(w http.ResponseWriter, r *http.Request) {
 	requestTime := time.Now()
 
 	// check if value is cached
@@ -166,7 +171,15 @@ func (p *LogAnalyticsProber) Run() {
 			p.ServiceDiscovery.ServiceDiscovery()
 		}
 
-		p.executeQueries()
+		err := p.executeQueries()
+		if err != nil {
+			p.logger.WithField("request", r.RequestURI).Error(err)
+			w.WriteHeader(http.StatusBadRequest)
+			if _, writeErr := w.Write([]byte("ERROR: " + err.Error())); writeErr != nil {
+				p.logger.Error(writeErr)
+			}
+			return
+		}
 
 		// store to cache (if enabeld)
 		if p.cache != nil && p.config.cacheEnabled {
@@ -202,10 +215,17 @@ func (p *LogAnalyticsProber) Run() {
 		}
 	}
 	p.logger.WithField("duration", time.Since(requestTime).String()).Debug("finished request")
+
+	h := promhttp.HandlerFor(p.GetPrometheusRegistry(), promhttp.HandlerOpts{})
+	h.ServeHTTP(w, r)
 }
 
-func (p *LogAnalyticsProber) executeQueries() {
+func (p *LogAnalyticsProber) executeQueries() error {
 	queryClient := p.LogAnalyticsQueryClient()
+
+	if len(p.workspaceList) == 0 {
+		return errors.New("no workspaces found")
+	}
 
 	for _, queryRow := range p.QueryConfig.Queries {
 		queryConfig := queryRow
@@ -233,22 +253,42 @@ func (p *LogAnalyticsProber) executeQueries() {
 
 		// query workspaces
 		go func() {
-			for _, row := range p.workspaceList {
-				workspaceId := row
-				// Run the query and get the results
-				prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
-
+			switch strings.ToLower(queryRow.QueryMode) {
+			case "all", "multi":
 				wgProbes.Add()
 				go func() {
 					defer wgProbes.Done()
-					p.sendQueryToWorkspace(
+					p.sendQueryToMultipleWorkspace(
 						contextLogger,
-						workspaceId,
+						p.workspaceList,
 						queryClient,
 						queryConfig,
 						resultChannel,
 					)
 				}()
+			case "", "single":
+				for _, row := range p.workspaceList {
+					workspaceId := row
+					// Run the query and get the results
+					prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
+
+					wgProbes.Add()
+					go func() {
+						defer wgProbes.Done()
+						p.sendQueryToSingleWorkspace(
+							contextLogger,
+							workspaceId,
+							queryClient,
+							queryConfig,
+							resultChannel,
+						)
+					}()
+				}
+			default:
+				contextLogger.Error(fmt.Errorf("invalid queryMode \"%s\"", queryRow.QueryMode))
+				resultChannel <- LogAnalyticsProbeResult{
+					Error: fmt.Errorf("invalid queryMode \"%s\"", queryRow.QueryMode),
+				}
 			}
 
 			// wait until queries are done for closing channel and waiting for result process
@@ -288,13 +328,73 @@ func (p *LogAnalyticsProber) executeQueries() {
 		prometheusQueryTime.With(prometheus.Labels{"module": p.config.moduleName, "metric": queryConfig.Metric}).Observe(elapsedTime.Seconds())
 		prometheusQueryResults.With(prometheus.Labels{"module": p.config.moduleName, "metric": queryConfig.Metric}).Set(float64(resultTotalRecords))
 	}
+
+	return nil
 }
 
-func (p *LogAnalyticsProber) sendQueryToWorkspace(logger *log.Entry, workspaceId string, queryClient operationalinsights.QueryClient, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, workspaces []string, queryClient operationalinsights.QueryClient, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+	workspaceLogger := logger.WithField("workspaceId", workspaces)
+
+	// Set options
+	queryBody := operationalinsights.QueryBody{
+		Query:      &queryConfig.Query,
+		Timespan:   queryConfig.Timespan,
+		Workspaces: &workspaces,
+	}
+
+	workspaceLogger.WithField("query", queryConfig.Query).Debug("send query to loganaltyics workspaces")
+	var queryResults, queryErr = queryClient.Execute(p.ctx, workspaces[0], queryBody)
+	if queryErr != nil {
+		workspaceLogger.Error(queryErr.Error())
+		result <- LogAnalyticsProbeResult{
+			Error: queryErr,
+		}
+		return
+	}
+
+	logger.Debug("fetched query result")
+	resultTables := *queryResults.Tables
+
+	if len(resultTables) >= 1 {
+		for _, table := range resultTables {
+			if table.Rows == nil || table.Columns == nil {
+				// no results found, skip table
+				continue
+			}
+
+			for _, v := range *table.Rows {
+				resultRow := map[string]interface{}{}
+
+				for colNum, colName := range *resultTables[0].Columns {
+					resultRow[to.String(colName.Name)] = v[colNum]
+				}
+
+				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
+					// inject workspaceId
+					for num := range metric {
+						metric[num].Labels["workspaceTable"] = to.String(table.Name)
+					}
+
+					result <- LogAnalyticsProbeResult{
+						WorkspaceId: "",
+						Name:        metricName,
+						Metrics:     metric,
+					}
+				}
+			}
+		}
+	}
+
+	logger.Debug("metrics parsed")
+}
+
+func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *log.Entry, workspaceId string, queryClient operationalinsights.QueryClient, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
 	workspaceLogger := logger.WithField("workspaceId", workspaceId)
 
 	// Set options
-	workspaces := []string{}
+	workspaces := []string{
+		workspaceId,
+	}
 	queryBody := operationalinsights.QueryBody{
 		Query:      &queryConfig.Query,
 		Timespan:   queryConfig.Timespan,
@@ -302,50 +402,50 @@ func (p *LogAnalyticsProber) sendQueryToWorkspace(logger *log.Entry, workspaceId
 	}
 
 	workspaceLogger.WithField("query", queryConfig.Query).Debug("send query to loganaltyics workspace")
-	var results, queryErr = queryClient.Execute(p.ctx, workspaceId, queryBody)
-
-	if queryErr == nil {
-		workspaceLogger.Debug("fetched query result")
-		resultTables := *results.Tables
-
-		if len(resultTables) >= 1 {
-			for _, table := range resultTables {
-				if table.Rows == nil || table.Columns == nil {
-					// no results found, skip table
-					continue
-				}
-
-				for _, v := range *table.Rows {
-					resultRow := map[string]interface{}{}
-
-					for colNum, colName := range *resultTables[0].Columns {
-						resultRow[to.String(colName.Name)] = v[colNum]
-					}
-
-					for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
-						// inject workspaceId
-						for num := range metric {
-							metric[num].Labels["workspaceTable"] = to.String(table.Name)
-							metric[num].Labels["workspaceID"] = workspaceId
-						}
-
-						result <- LogAnalyticsProbeResult{
-							WorkspaceId: workspaceId,
-							Name:        metricName,
-							Metrics:     metric,
-						}
-					}
-				}
-			}
-		}
-
-		workspaceLogger.Debug("metrics parsed")
-	} else {
+	var queryResults, queryErr = queryClient.Execute(p.ctx, workspaceId, queryBody)
+	if queryErr != nil {
 		workspaceLogger.Error(queryErr.Error())
 		result <- LogAnalyticsProbeResult{
 			Error: queryErr,
 		}
+		return
 	}
+
+	logger.Debug("fetched query result")
+	resultTables := *queryResults.Tables
+
+	if len(resultTables) >= 1 {
+		for _, table := range resultTables {
+			if table.Rows == nil || table.Columns == nil {
+				// no results found, skip table
+				continue
+			}
+
+			for _, v := range *table.Rows {
+				resultRow := map[string]interface{}{}
+
+				for colNum, colName := range *resultTables[0].Columns {
+					resultRow[to.String(colName.Name)] = v[colNum]
+				}
+
+				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
+					// inject workspaceId
+					for num := range metric {
+						metric[num].Labels["workspaceTable"] = to.String(table.Name)
+						metric[num].Labels["workspaceID"] = workspaceId
+					}
+
+					result <- LogAnalyticsProbeResult{
+						WorkspaceId: workspaceId,
+						Name:        metricName,
+						Metrics:     metric,
+					}
+				}
+			}
+		}
+	}
+
+	logger.Debug("metrics parsed")
 }
 
 func (p *LogAnalyticsProber) parseCacheTime(r *http.Request) (time.Duration, error) {

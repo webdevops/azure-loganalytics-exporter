@@ -1,3 +1,11 @@
+#################################
+# This example sends the query to every LogAnalytics workspace and fetches AKS log information (single mode):
+#
+#  azure_metrics_loganalytics_ingestion_aks_rows: number of log lines per namespace in 1 hour
+#  azure_metrics_loganalytics_ingestion_aks_bytes: log bytes per namespace in 1 hour
+#
+#################################
+
 queries:
   #########################################################
   ## rows metric for tables (per second)

@@ -1,3 +1,11 @@
+#################################
+# This example sends the query to every LogAnalytics workspace and fetches general information:
+#
+#  azure_metrics_loganalytics_ingestion_overall_rows: number of log lines per LogAnalytics table in 1 hour
+#  azure_metrics_loganalytics_ingestion_overall_bytes: log bytes per LogAnalytics table in 1 hour
+#  azure_metrics_loganalytics_ingestion_latency*: log ingestion latency metrics
+#
+#################################
 queries:
   #########################################################
   ## rows metric for tables (per second)

@@ -1,0 +1,69 @@
+#################################
+# This example sends the query to multiple LogAnalytics workspaces and fetches AKS log information (multi mode):
+#
+#  azure_metrics_loganalytics_ingestion_aks_rows: number of log lines per namespace and cluster in 1 hour
+#  azure_metrics_loganalytics_ingestion_aks_bytes: log bytes per namespace and cluster in 1 hour
+#
+#################################
+queries:
+  #########################################################
+  ## rows metric for tables (per second)
+  - metric: azure_metrics_loganalytics_ingestion_aks_rows
+    queryMode: multi
+    query: |-
+      ContainerLog
+      | join kind = inner (KubePodInventory
+          | project ContainerID, PodName=Name, ControllerKind, ControllerName, Namespace
+          | distinct *
+      ) on ContainerID
+      | project Namespace, _ResourceId
+      | summarize count_ = count() by Namespace,_ResourceId
+      | project _ResourceId, Namespace, count_ = (todouble(count_) / 3600)
+    timespan: PT1H
+    fields:
+      -
+        name: _ResourceId
+        target: cluster
+        type: id
+        filters: [toLower]
+      -
+        name: Namespace
+        target: sourceNamespace
+        type: id
+        filters: [toLower]
+      -
+        name: count_
+        type: value
+    defaultField:
+      type: ignore
+
+  #########################################################
+  ## bytes metric for tables (per second)
+  - metric: azure_metrics_loganalytics_ingestion_aks_bytes
+    queryMode: multi
+    query: |-
+      ContainerLog
+      | where _IsBillable == true
+      | join kind = inner (KubePodInventory
+          | project ContainerID, PodName=Name, ControllerKind, ControllerName, Namespace
+          | distinct *
+      ) on ContainerID
+      | summarize count_ = sum(_BilledSize) by Namespace, _ResourceId
+      | project _ResourceId, Namespace, count_ = (todouble(count_) / 3600)
+    timespan: PT1H
+    fields:
+      -
+        name: _ResourceId
+        target: cluster
+        type: id
+        filters: [toLower]
+      -
+        name: Namespace
+        target: sourceNamespace
+        type: id
+        filters: [toLower]
+      -
+        name: count_
+        type: value
+    defaultField:
+      type: ignore

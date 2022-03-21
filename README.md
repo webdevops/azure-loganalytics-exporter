@@ -132,7 +132,9 @@ environment variables (eg. setting buckets, disabling metrics or disable autores
 
 see [example.yaml](example.yaml) for general ingestion metrics (number of rows per second and number of bytes per second per table)
 
-see [example.aks.yaml](example.aks.yaml) for AKS namespace ingestion metrics (number of rows per second and number of bytes per AKS namespace)
+see [example.aks-single.yaml](example.aks-single.yaml) for AKS namespace ingestion metrics (number of rows per second and number of bytes per AKS namespace) sending queryies to each LogAnalaytics workspace individually (single mode)
+
+see [example.aks-multi.yaml](example.aks-multi.yaml) for AKS namespace ingestion metrics (number of rows per second and number of bytes per AKS namespace) sending one query against multiple LogAnalaytics workspaces (multi mode)
 
 more examples of result processing can be found within [azure-resourcegraph-expoter](https://github.com/webdevops/azure-resourcegraph-exporter) (uses same processing library)
 
