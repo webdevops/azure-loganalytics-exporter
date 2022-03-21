@@ -141,9 +141,9 @@
                 <div class="col-sm-10">
                     <select id="endpoint" class="form-select" aria-label="endpoint">
                         <option selected value="">- select endpoint -</option>
-                        <option>/probe</option>
-                        <option>/probe/workspace</option>
-                        <option>/probe/subscription</option>
+                        <option value="/probe">/probe (predefined workspaces as cmdline option or in config)</option>
+                        <option value="/probe/workspace">/probe/workspace (static workspace list in request)</option>
+                        <option value="/probe/subscription">/probe/subscription (servicediscovery; every workspace in subscription)</option>
                     </select>
                     <div class="form-text">azure-loganalytics-exporter query endpoint</div>
                 </div>
