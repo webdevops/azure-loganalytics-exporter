@@ -41,12 +41,13 @@ for Azure API authentication (using ENV vars) see https://docs.microsoft.com/en-
 
 ## HTTP Endpoints
 
-| Endpoint                       | Description                                                                         |
-|--------------------------------|-------------------------------------------------------------------------------------|
-| `/metrics`                     | Default prometheus golang metrics                                                   |
-| `/probe`                       | Execute loganalytics queries against workspaces (set on commandline/env var)        |
-| `/probe/workspace`             | Execute loganalytics queries against workspaces (defined as parameter)              |
-| `/probe/subscription`          | Execute loganalytics queries against workspaces (using servicediscovery)            |
+| Endpoint              | Description                                                                  |
+|-----------------------|------------------------------------------------------------------------------|
+| `/query`              | Query tester                                                                 |
+| `/metrics`            | Default prometheus golang metrics                                            |
+| `/probe`              | Execute loganalytics queries against workspaces (set on commandline/env var) |
+| `/probe/workspace`    | Execute loganalytics queries against workspaces (defined as parameter)       |
+| `/probe/subscription` | Execute loganalytics queries against workspaces (using servicediscovery)     |
 
 HINT: parameters of type `multiple` can be either specified multiple times and/or splits multiple values by comma.
 

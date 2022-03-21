@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"path"
@@ -147,6 +148,17 @@ func startHttpServer() {
 	// healthz
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
+			log.Error(err)
+		}
+	})
+
+	// report
+	reportTmpl := template.Must(template.ParseFiles("./templates/query.html"))
+	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "text/html")
+		w.Header().Add("Content-Security-Policy", "default-src 'self'; script-src-elem 'unsafe-inline' cdnjs.cloudflare.com; style-src * data: 'unsafe-inline'; style-src-elem 'self' data: 'unsafe-inline' cdnjs.cloudflare.com; img-src 'self' data:")
+
+		if err := reportTmpl.Execute(w, nil); err != nil {
 			log.Error(err)
 		}
 	})
