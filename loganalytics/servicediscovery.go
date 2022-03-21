@@ -1,13 +1,14 @@
 package loganalytics
 
 import (
-	"crypto/sha1" //#nosec
+	"crypto/sha1" // #nosec
 	"encoding/json"
 	"fmt"
+	"time"
+
 	operationalinsightsProfile "github.com/Azure/azure-sdk-for-go/profiles/latest/operationalinsights/mgmt/operationalinsights"
 	"github.com/Azure/go-autorest/autorest/to"
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 type (
@@ -50,7 +51,7 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 		cacheKey = fmt.Sprintf(
 			"sd:%x",
 			string(sha1.New().Sum([]byte(fmt.Sprintf("%v", subscriptionList)))),
-		) //#nosec
+		) // #nosec
 	}
 
 	// try cache

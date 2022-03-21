@@ -2,6 +2,13 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"os"
+	"path"
+	"runtime"
+	"strings"
+	"time"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -9,16 +16,11 @@ import (
 	cache "github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"github.com/webdevops/azure-loganalytics-exporter/config"
-	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 	"github.com/webdevops/azure-resourcegraph-exporter/kusto"
 	"github.com/webdevops/go-prometheus-common/azuretracing"
-	"net/http"
-	"os"
-	"path"
-	"runtime"
-	"strings"
-	"time"
+
+	"github.com/webdevops/azure-loganalytics-exporter/config"
+	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 )
 
 const (
