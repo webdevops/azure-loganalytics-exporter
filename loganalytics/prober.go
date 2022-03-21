@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
@@ -64,6 +64,8 @@ type (
 		}
 
 		ServiceDiscovery LogAnalyticsServiceDiscovery
+
+		concurrencyWaitGroup *sizedwaitgroup.SizedWaitGroup
 	}
 
 	LogAnalyticsProbeResult struct {
@@ -78,13 +80,14 @@ type (
 	}
 )
 
-func NewLogAnalyticsProber(w http.ResponseWriter, r *http.Request) *LogAnalyticsProber {
+func NewLogAnalyticsProber(w http.ResponseWriter, r *http.Request, concurrencyWaitGroup *sizedwaitgroup.SizedWaitGroup) *LogAnalyticsProber {
 	prober := LogAnalyticsProber{}
 	prober.workspaceList = []string{}
 	prober.request = r
 	prober.response = w
 	prober.ctx = context.Background()
 	prober.registry = prometheus.NewRegistry()
+	prober.concurrencyWaitGroup = concurrencyWaitGroup
 
 	prober.metricList = &kusto.MetricList{}
 	prober.metricList.Init()
@@ -145,7 +148,7 @@ func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.Query
 	return client
 }
 
-func (p *LogAnalyticsProber) Run(w http.ResponseWriter, r *http.Request) {
+func (p *LogAnalyticsProber) Run() {
 	requestTime := time.Now()
 
 	// check if value is cached
@@ -173,9 +176,9 @@ func (p *LogAnalyticsProber) Run(w http.ResponseWriter, r *http.Request) {
 
 		err := p.executeQueries()
 		if err != nil {
-			p.logger.WithField("request", r.RequestURI).Error(err)
-			w.WriteHeader(http.StatusBadRequest)
-			if _, writeErr := w.Write([]byte("ERROR: " + err.Error())); writeErr != nil {
+			p.logger.WithField("request", p.request.RequestURI).Error(err)
+			p.response.WriteHeader(http.StatusBadRequest)
+			if _, writeErr := p.response.Write([]byte("ERROR: " + err.Error())); writeErr != nil {
 				p.logger.Error(writeErr)
 			}
 			return
@@ -217,7 +220,7 @@ func (p *LogAnalyticsProber) Run(w http.ResponseWriter, r *http.Request) {
 	p.logger.WithField("duration", time.Since(requestTime).String()).Debug("finished request")
 
 	h := promhttp.HandlerFor(p.GetPrometheusRegistry(), promhttp.HandlerOpts{})
-	h.ServeHTTP(w, r)
+	h.ServeHTTP(p.response, p.request)
 }
 
 func (p *LogAnalyticsProber) executeQueries() error {
@@ -254,15 +257,17 @@ func (p *LogAnalyticsProber) executeQueries() error {
 		resultTotalRecords := 0
 
 		resultChannel := make(chan LogAnalyticsProbeResult)
-		wgProbes := p.NewSizedWaitGroup()
+		wgProbes := sync.WaitGroup{}
 
 		// query workspaces
 		go func() {
 			switch strings.ToLower(queryRow.QueryMode) {
 			case "all", "multi":
-				wgProbes.Add()
+				wgProbes.Add(1)
+				p.concurrencyWaitGroup.Add()
 				go func() {
 					defer wgProbes.Done()
+					defer p.concurrencyWaitGroup.Done()
 					p.sendQueryToMultipleWorkspace(
 						contextLogger,
 						workspaceList,
@@ -277,9 +282,11 @@ func (p *LogAnalyticsProber) executeQueries() error {
 					// Run the query and get the results
 					prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
 
-					wgProbes.Add()
+					wgProbes.Add(1)
+					p.concurrencyWaitGroup.Add()
 					go func() {
 						defer wgProbes.Done()
+						defer p.concurrencyWaitGroup.Done()
 						p.sendQueryToSingleWorkspace(
 							contextLogger,
 							workspaceId,
@@ -464,19 +471,6 @@ func (p *LogAnalyticsProber) parseCacheTime(r *http.Request) (time.Duration, err
 	}
 
 	return 0, nil
-}
-
-func (p *LogAnalyticsProber) NewSizedWaitGroup() sizedwaitgroup.SizedWaitGroup {
-	size := p.Conf.Loganalytics.Parallel
-
-	parallelString := p.request.URL.Query().Get("parallel")
-	if parallelString != "" {
-		if v, err := strconv.ParseInt(parallelString, 10, 64); err == nil {
-			size = int(v)
-		}
-	}
-
-	return sizedwaitgroup.New(size)
 }
 
 func (p *LogAnalyticsProber) decorateAzureAutoRest(client *autorest.Client) {

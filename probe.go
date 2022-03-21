@@ -35,7 +35,7 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 
 	prober := NewLogAnalyticsProber(w, r)
 	prober.AddWorkspaces(opts.Loganalytics.Workspace...)
-	prober.Run(w, r)
+	prober.Run()
 }
 
 func handleProbeWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func handleProbeWorkspace(w http.ResponseWriter, r *http.Request) {
 
 	prober := NewLogAnalyticsProber(w, r)
 	prober.AddWorkspaces(workspaceList...)
-	prober.Run(w, r)
+	prober.Run()
 }
 
 func handleProbeSubscriptionRequest(w http.ResponseWriter, r *http.Request) {
@@ -56,11 +56,11 @@ func handleProbeSubscriptionRequest(w http.ResponseWriter, r *http.Request) {
 
 	prober := NewLogAnalyticsProber(w, r)
 	prober.ServiceDiscovery.Use()
-	prober.Run(w, r)
+	prober.Run()
 }
 
 func NewLogAnalyticsProber(w http.ResponseWriter, r *http.Request) *loganalytics.LogAnalyticsProber {
-	prober := loganalytics.NewLogAnalyticsProber(w, r)
+	prober := loganalytics.NewLogAnalyticsProber(w, r, &concurrentWaitGroup)
 	prober.QueryConfig = Config
 	prober.Conf = opts
 	prober.UserAgent = UserAgent + gitTag

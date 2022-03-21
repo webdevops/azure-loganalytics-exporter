@@ -7,7 +7,7 @@
 queries:
   #########################################################
   ## rows metric for tables (per second)
-  - metric: azure_metrics_loganalytics_ingestion_overall_rows
+  - metric: azure_metrics_loganalytics_ingestion_overall_rows3
     #queryMode: multi
     workspaces:
       - a70cb3ef-7783-4e54-9335-2adfc4abb42c

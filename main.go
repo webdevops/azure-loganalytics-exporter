@@ -16,6 +16,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/go-prometheus-common/azuretracing"
 	"github.com/webdevops/go-prometheus-common/kusto"
@@ -40,6 +41,8 @@ var (
 	OpInsightsAuthorizer autorest.Authorizer
 	AzureEnvironment     azure.Environment
 
+	concurrentWaitGroup sizedwaitgroup.SizedWaitGroup
+
 	metricCache *cache.Cache
 
 	// Git version information
@@ -53,6 +56,8 @@ func main() {
 	log.Infof("starting azure-loganalytics-exporter v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
 	log.Info(string(opts.GetJson()))
 	loganalytics.InitGlobalMetrics()
+
+	concurrentWaitGroup = sizedwaitgroup.New(opts.Loganalytics.Concurrency)
 
 	metricCache = cache.New(120*time.Second, 60*time.Second)
 
