@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -161,10 +163,27 @@ func startHttpServer() {
 	// report
 	reportTmpl := template.Must(template.ParseFiles("./templates/query.html"))
 	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/html")
-		w.Header().Add("Content-Security-Policy", "default-src 'self'; script-src-elem 'unsafe-inline' cdnjs.cloudflare.com; style-src * data: 'unsafe-inline'; style-src-elem 'self' data: 'unsafe-inline' cdnjs.cloudflare.com; img-src 'self' data:")
+		cspNonce := base64.StdEncoding.EncodeToString([]byte(uuid.New().String()))
 
-		if err := reportTmpl.Execute(w, nil); err != nil {
+		w.Header().Add("Content-Type", "text/html")
+		w.Header().Add("Referrer-Policy", "same-origin")
+		w.Header().Add("X-Frame-Options", "DENY")
+		w.Header().Add("X-XSS-Protection", "1; mode=block")
+		w.Header().Add("X-Content-Type-Options", "nosniff")
+		w.Header().Add("Content-Security-Policy",
+			fmt.Sprintf(
+				"default-src 'self'; script-src-elem 'nonce-%[1]s'; style-src 'nonce-%[1]s'; img-src 'self' data:",
+				cspNonce,
+			),
+		)
+
+		templatePayload := struct {
+			Nonce string
+		}{
+			Nonce: cspNonce,
+		}
+
+		if err := reportTmpl.Execute(w, templatePayload); err != nil {
 			log.Error(err)
 		}
 	})
