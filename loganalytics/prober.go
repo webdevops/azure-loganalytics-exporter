@@ -145,6 +145,21 @@ func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.Query
 	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
 	p.decorateAzureAutoRest(&client.Client)
 	client.Authorizer = p.Azure.OpInsightsAuthorizer
+
+	client.RequestInspector = func(p autorest.Preparer) autorest.Preparer {
+		return autorest.PreparerFunc(func(r *http.Request) (*http.Request, error) {
+			r, err := p.Prepare(r)
+			if err == nil {
+				ctx := r.Context()
+				ctx = context.WithValue(ctx, "webdevops:prom:tracing", time.Now().UTC()) // nolint:staticcheck
+				r = r.WithContext(ctx)
+			}
+
+			r.Header.Add("cache-control", "no-cache")
+			return r, err
+		})
+	}
+
 	return client
 }
 
