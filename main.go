@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"net/http"
 	"os"
-	"path"
 	"runtime"
 	"strings"
 	"time"
@@ -54,6 +53,7 @@ var (
 
 func main() {
 	initArgparser()
+	initLogger()
 
 	log.Infof("starting azure-loganalytics-exporter v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
 	log.Info(string(opts.GetJson()))
@@ -88,34 +88,36 @@ func initArgparser() {
 			os.Exit(1)
 		}
 	}
+}
 
+func initLogger() {
 	// verbose level
-	if opts.Logger.Verbose {
+	if opts.Logger.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	// debug level
-	if opts.Logger.Debug {
+	// trace level
+	if opts.Logger.Trace {
 		log.SetReportCaller(true)
 		log.SetLevel(log.TraceLevel)
 		log.SetFormatter(&log.TextFormatter{
 			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-				s := strings.Split(f.Function, ".")
+				s := strings.Split(f.Function, "/")
 				funcName := s[len(s)-1]
-				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+				return funcName, fmt.Sprintf("%s:%d", f.File, f.Line)
 			},
 		})
 	}
 
 	// json log format
-	if opts.Logger.LogJson {
+	if opts.Logger.Json {
 		log.SetReportCaller(true)
 		log.SetFormatter(&log.JSONFormatter{
 			DisableTimestamp: true,
 			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-				s := strings.Split(f.Function, ".")
+				s := strings.Split(f.Function, "/")
 				funcName := s[len(s)-1]
-				return funcName, fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+				return funcName, fmt.Sprintf("%s:%d", f.File, f.Line)
 			},
 		})
 	}
