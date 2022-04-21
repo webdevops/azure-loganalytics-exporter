@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/webdevops/go-common v0.0.0-20220410190409-7b8e84fab0bf
+	github.com/webdevops/go-common v0.0.0-20220421192513-82bbcabf4b1b
 )
 
 require (

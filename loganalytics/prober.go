@@ -143,22 +143,21 @@ func (p *LogAnalyticsProber) AddWorkspaces(workspace ...string) {
 func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.QueryClient {
 	// Create and authorize operationalinsights client
 	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
-	p.decorateAzureAutoRest(&client.Client)
+	if err := client.AddToUserAgent(p.UserAgent); err != nil {
+		log.Panic(err)
+	}
 	client.Authorizer = p.Azure.OpInsightsAuthorizer
 
-	client.RequestInspector = func(p autorest.Preparer) autorest.Preparer {
-		return autorest.PreparerFunc(func(r *http.Request) (*http.Request, error) {
-			r, err := p.Prepare(r)
-			if err == nil {
-				ctx := r.Context()
-				ctx = context.WithValue(ctx, "webdevops:prom:tracing", time.Now().UTC()) // nolint:staticcheck
-				r = r.WithContext(ctx)
-			}
-
-			r.Header.Add("cache-control", "no-cache")
-			return r, err
-		})
+	requestCallback := func(r *http.Request) (*http.Request, error) {
+		r.Header.Add("cache-control", "no-cache")
+		return r, nil
 	}
+
+	azuretracing.DecorateAzureAutoRestClientWithCallbacks(
+		&client.Client,
+		&requestCallback,
+		nil,
+	)
 
 	return client
 }
