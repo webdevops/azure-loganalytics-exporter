@@ -21,7 +21,7 @@ type (
 func (sd *LogAnalyticsServiceDiscovery) ResourcesClient(subscriptionId string) *operationalinsightsProfile.WorkspacesClient {
 	prober := sd.prober
 
-	client := operationalinsightsProfile.NewWorkspacesClientWithBaseURI(prober.Azure.Environment.ResourceManagerEndpoint, subscriptionId)
+	client := operationalinsightsProfile.NewWorkspacesClientWithBaseURI(prober.Azure.Client.Environment.ResourceManagerEndpoint, subscriptionId)
 	prober.decorateAzureAutoRest(&client.Client)
 
 	return &client

@@ -10,15 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
+	azureCommon "github.com/webdevops/go-common/azure"
 	"github.com/webdevops/go-common/prometheus/azuretracing"
 	"github.com/webdevops/go-common/prometheus/kusto"
 
@@ -38,9 +36,7 @@ var (
 
 	Config kusto.Config
 
-	AzureAuthorizer      autorest.Authorizer
-	OpInsightsAuthorizer autorest.Authorizer
-	AzureEnvironment     azure.Environment
+	AzureClient *azureCommon.Client
 
 	concurrentWaitGroup sizedwaitgroup.SizedWaitGroup
 
@@ -132,31 +128,27 @@ func readConfig() {
 	}
 }
 
-// Init and build Azure authorzier
 func initAzureConnection() {
 	var err error
-
-	AzureEnvironment, err = azure.EnvironmentFromName(*opts.Azure.Environment)
+	AzureClient, err = azureCommon.NewClientFromEnvironment(*opts.Azure.Environment, log.StandardLogger())
 	if err != nil {
-		log.Panic(err)
+		log.Panic(err.Error())
 	}
 
-	// setup azure authorizer
-	AzureAuthorizer, err = auth.NewAuthorizerFromEnvironment()
-	if err != nil {
-		log.Panic(err)
-	}
-
-	OpInsightsAuthorizer, err = auth.NewAuthorizerFromEnvironmentWithResource(AzureEnvironment.ResourceIdentifiers.OperationalInsights)
-	if err != nil {
-		log.Panic(err)
-	}
+	AzureClient.SetUserAgent(UserAgent + gitTag)
 }
 
 // start and handle prometheus handler
 func startHttpServer() {
 	// healthz
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := fmt.Fprint(w, "Ok"); err != nil {
+			log.Error(err)
+		}
+	})
+
+	// readyz
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprint(w, "Ok"); err != nil {
 			log.Error(err)
 		}

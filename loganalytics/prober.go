@@ -13,13 +13,13 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
+	azureCommon "github.com/webdevops/go-common/azure"
 	"github.com/webdevops/go-common/prometheus/azuretracing"
 	"github.com/webdevops/go-common/prometheus/kusto"
 
@@ -37,9 +37,7 @@ type (
 		UserAgent   string
 
 		Azure struct {
-			Environment          azure.Environment
-			OpInsightsAuthorizer autorest.Authorizer
-			AzureAuthorizer      autorest.Authorizer
+			Client *azureCommon.Client
 		}
 
 		workspaceList []string
@@ -142,11 +140,11 @@ func (p *LogAnalyticsProber) AddWorkspaces(workspace ...string) {
 
 func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.QueryClient {
 	// Create and authorize operationalinsights client
-	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
+	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Client.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
 	if err := client.AddToUserAgent(p.UserAgent); err != nil {
 		log.Panic(err)
 	}
-	client.Authorizer = p.Azure.OpInsightsAuthorizer
+	client.Authorizer = p.Azure.Client.GetAuthorizerWithResource(p.Azure.Client.Environment.ResourceIdentifiers.OperationalInsights)
 
 	requestCallback := func(r *http.Request) (*http.Request, error) {
 		r.Header.Add("cache-control", "no-cache")
@@ -488,9 +486,5 @@ func (p *LogAnalyticsProber) parseCacheTime(r *http.Request) (time.Duration, err
 }
 
 func (p *LogAnalyticsProber) decorateAzureAutoRest(client *autorest.Client) {
-	client.Authorizer = p.Azure.AzureAuthorizer
-	if err := client.AddToUserAgent(p.UserAgent); err != nil {
-		log.Panic(err)
-	}
-	azuretracing.DecorateAzureAutoRestClient(client)
+	p.Azure.Client.DecorateAzureAutorest(client)
 }
