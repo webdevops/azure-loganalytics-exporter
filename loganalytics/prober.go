@@ -134,8 +134,21 @@ func (p *LogAnalyticsProber) GetPrometheusRegistry() *prometheus.Registry {
 	return p.registry
 }
 
-func (p *LogAnalyticsProber) AddWorkspaces(workspace ...string) {
-	p.workspaceList = append(p.workspaceList, workspace...)
+func (p *LogAnalyticsProber) AddWorkspaces(workspaces ...string) {
+	for _, workspace := range workspaces {
+
+		if strings.HasPrefix(workspace, "/subscriptions/") {
+			workspaceResource, err := p.ServiceDiscovery.GetWorkspace(p.ctx, workspace)
+			if err != nil {
+				p.logger.Panic(err)
+			}
+
+			workspace = to.String(workspaceResource.CustomerID)
+		}
+
+		p.workspaceList = append(p.workspaceList, workspace)
+	}
+
 }
 
 func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.QueryClient {

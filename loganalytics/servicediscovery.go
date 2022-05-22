@@ -1,14 +1,17 @@
 package loganalytics
 
 import (
+	"context"
 	"crypto/sha1" // #nosec
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	operationalinsightsProfile "github.com/Azure/azure-sdk-for-go/profiles/latest/operationalinsights/mgmt/operationalinsights"
 	"github.com/Azure/go-autorest/autorest/to"
 	log "github.com/sirupsen/logrus"
+	azureCommon "github.com/webdevops/go-common/azure"
 )
 
 type (
@@ -31,6 +34,50 @@ func (sd *LogAnalyticsServiceDiscovery) Use() {
 	sd.enabled = true
 }
 
+func (sd *LogAnalyticsServiceDiscovery) IsCacheEnabled() bool {
+	prober := sd.prober
+	return prober.cache != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration.Seconds() > 0
+}
+
+func (sd *LogAnalyticsServiceDiscovery) GetWorkspace(ctx context.Context, resourceId string) (*operationalinsightsProfile.Workspace, error) {
+	var serviceDiscoveryCacheDuration *time.Duration
+	cacheKey := ""
+	prober := sd.prober
+
+	if sd.IsCacheEnabled() {
+		serviceDiscoveryCacheDuration = prober.Conf.Azure.ServiceDiscovery.CacheDuration
+		cacheKey = fmt.Sprintf(
+			"sd:workspace:%x",
+			strings.ToLower(resourceId),
+		) // #nosec
+
+		// try cache
+		if v, ok := prober.cache.Get(cacheKey); ok {
+			if cacheData, ok := v.(operationalinsightsProfile.Workspace); ok {
+				fmt.Println("from cache: " + resourceId)
+				return &cacheData, nil
+			}
+		}
+	}
+
+	resourceInfo, err := azureCommon.ParseResourceId(resourceId)
+	if err != nil {
+		return nil, err
+	}
+
+	workspace, err := sd.ResourcesClient(resourceInfo.Subscription).Get(ctx, resourceInfo.ResourceGroup, resourceInfo.ResourceName)
+	if err != nil {
+		return nil, err
+	}
+
+	if serviceDiscoveryCacheDuration != nil {
+		fmt.Println("to cache: " + resourceId)
+		prober.cache.Set(cacheKey, workspace, *serviceDiscoveryCacheDuration)
+	}
+
+	return &workspace, nil
+}
+
 func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 	var serviceDiscoveryCacheDuration *time.Duration
 	cacheKey := ""
@@ -46,16 +93,14 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 		panic(LogAnalyticsPanicStop{Message: err.Error()})
 	}
 
-	if prober.cache != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration.Seconds() > 0 {
+	if sd.IsCacheEnabled() {
 		serviceDiscoveryCacheDuration = prober.Conf.Azure.ServiceDiscovery.CacheDuration
 		cacheKey = fmt.Sprintf(
 			"sd:%x",
 			string(sha1.New().Sum([]byte(fmt.Sprintf("%v", subscriptionList)))),
 		) // #nosec
-	}
 
-	// try cache
-	if serviceDiscoveryCacheDuration != nil {
+		// try cache
 		if v, ok := prober.cache.Get(cacheKey); ok {
 			if cacheData, ok := v.([]byte); ok {
 				if err := json.Unmarshal(cacheData, &prober.workspaceList); err == nil {
