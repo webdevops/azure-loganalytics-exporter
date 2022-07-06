@@ -271,12 +271,6 @@ func (p *LogAnalyticsProber) executeQueries() error {
 
 		contextLogger := p.logger.WithField("metric", queryConfig.Metric)
 
-		if queryConfig.Timespan == nil {
-			err := fmt.Errorf("timespan missing")
-			contextLogger.Error(err)
-			panic(LogAnalyticsPanicStop{Message: err.Error()})
-		}
-
 		contextLogger.Debug("starting query")
 
 		resultTotalRecords := 0
