@@ -17,17 +17,19 @@ Usage:
   azure-loganalytics-exporter [OPTIONS]
 
 Application Options:
-      --debug                         debug mode [$DEBUG]
-  -v, --verbose                       verbose mode [$VERBOSE]
+      --log.debug                     debug mode [$LOG_DEBUG]
+      --log.trace                     trace mode [$LOG_TRACE]
       --log.json                      Switch log output to json format [$LOG_JSON]
       --azure.environment=            Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
-      --azure.servicediscovery.cache= Duration for caching Azure ServiceDiscovery of workspaces to reduce API
-                                      calls (time.Duration) (default: 30m) [$AZURE_SERVICEDISCOVERY_CACHE]
+      --azure.servicediscovery.cache= Duration for caching Azure ServiceDiscovery of workspaces to reduce API calls
+                                      (time.Duration) (default: 30m) [$AZURE_SERVICEDISCOVERY_CACHE]
       --loganalytics.workspace=       Loganalytics workspace IDs [$LOGANALYTICS_WORKSPACE]
-      --loganalytics.parallel=        Specifies how many workspaces should be queried in parallel (default: 5)
-                                      [$LOGANALYTICS_PARALLEL]
+      --loganalytics.concurrency=     Specifies how many workspaces should be queried concurrently (default: 5)
+                                      [$LOGANALYTICS_CONCURRENCY]
   -c, --config=                       Config path [$CONFIG]
-      --bind=                         Server address (default: :8080) [$SERVER_BIND]
+      --server.bind=                  Server address (default: :8080) [$SERVER_BIND]
+      --server.timeout.read=          Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
+      --server.timeout.write=         Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
 
 Help Options:
   -h, --help                          Show this help message
