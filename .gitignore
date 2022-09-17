@@ -1,3 +1,4 @@
 /vendor/
 /azure-loganalytics-exporter
 /*.exe
+/release-assets
