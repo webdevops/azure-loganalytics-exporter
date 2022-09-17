@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -23,7 +24,6 @@ import (
 
 	"github.com/webdevops/azure-loganalytics-exporter/config"
 	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
-	"github.com/webdevops/azure-loganalytics-exporter/templates"
 )
 
 const (
@@ -43,6 +43,9 @@ var (
 	concurrentWaitGroup sizedwaitgroup.SizedWaitGroup
 
 	metricCache *cache.Cache
+
+	//go:embed templates/*.html
+	templates embed.FS
 
 	// Git version information
 	gitCommit = "<unknown>"
@@ -160,10 +163,9 @@ func startHttpServer() {
 	})
 
 	// report
-	reportTmpl, err := template.New("report").Parse(templates.QueryHtml)
-	if err != nil {
-		log.Panicf("failed to parse query.html: %v", err.Error())
-	}
+
+	tmpl := template.Must(template.ParseFS(templates, "templates/*.html"))
+
 	mux.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
 		cspNonce := base64.StdEncoding.EncodeToString([]byte(uuid.New().String()))
 
@@ -185,7 +187,7 @@ func startHttpServer() {
 			Nonce: cspNonce,
 		}
 
-		if err := reportTmpl.Execute(w, templatePayload); err != nil {
+		if err := tmpl.ExecuteTemplate(w, "query.html", templatePayload); err != nil {
 			log.Error(err)
 		}
 	})
