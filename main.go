@@ -18,8 +18,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
-	azureCommon "github.com/webdevops/go-common/azure"
-	"github.com/webdevops/go-common/prometheus/azuretracing"
+	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/azuresdk/prometheus/tracing"
 	"github.com/webdevops/go-common/prometheus/kusto"
 
 	"github.com/webdevops/azure-loganalytics-exporter/config"
@@ -38,7 +38,8 @@ var (
 
 	Config kusto.Config
 
-	AzureClient *azureCommon.Client
+	AzureClient                *armclient.ArmClient
+	AzureSubscriptionsIterator *armclient.SubscriptionsIterator
 
 	concurrentWaitGroup sizedwaitgroup.SizedWaitGroup
 
@@ -136,7 +137,7 @@ func readConfig() {
 
 func initAzureConnection() {
 	var err error
-	AzureClient, err = azureCommon.NewClientFromEnvironment(*opts.Azure.Environment, log.StandardLogger())
+	AzureClient, err = armclient.NewArmClientWithCloudName(*opts.Azure.Environment, log.StandardLogger())
 	if err != nil {
 		log.Panic(err.Error())
 	}
@@ -192,7 +193,7 @@ func startHttpServer() {
 		}
 	})
 
-	mux.Handle("/metrics", azuretracing.RegisterAzureMetricAutoClean(promhttp.Handler()))
+	mux.Handle("/metrics", tracing.RegisterAzureMetricAutoClean(promhttp.Handler()))
 
 	mux.HandleFunc("/probe", handleProbeRequest)
 	mux.HandleFunc("/probe/workspace", handleProbeWorkspace)

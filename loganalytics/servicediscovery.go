@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	operationalinsightsProfile "github.com/Azure/azure-sdk-for-go/profiles/latest/operationalinsights/mgmt/operationalinsights"
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
 	log "github.com/sirupsen/logrus"
-	azureCommon "github.com/webdevops/go-common/azure"
+	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/utils/to"
 )
 
 type (
@@ -21,13 +21,16 @@ type (
 	}
 )
 
-func (sd *LogAnalyticsServiceDiscovery) ResourcesClient(subscriptionId string) *operationalinsightsProfile.WorkspacesClient {
+func (sd *LogAnalyticsServiceDiscovery) ResourcesClient(subscriptionId string) *armoperationalinsights.WorkspacesClient {
 	prober := sd.prober
+	azureClient := prober.Azure.Client
 
-	client := operationalinsightsProfile.NewWorkspacesClientWithBaseURI(prober.Azure.Client.Environment.ResourceManagerEndpoint, subscriptionId)
-	prober.decorateAzureAutoRest(&client.Client)
+	client, err := armoperationalinsights.NewWorkspacesClient(subscriptionId, azureClient.GetCred(), azureClient.NewArmClientOptions())
+	if err != nil {
+		prober.logger.Panic(err)
+	}
 
-	return &client
+	return client
 }
 
 func (sd *LogAnalyticsServiceDiscovery) Use() {
@@ -39,7 +42,7 @@ func (sd *LogAnalyticsServiceDiscovery) IsCacheEnabled() bool {
 	return prober.cache != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration != nil && prober.Conf.Azure.ServiceDiscovery.CacheDuration.Seconds() > 0
 }
 
-func (sd *LogAnalyticsServiceDiscovery) GetWorkspace(ctx context.Context, resourceId string) (*operationalinsightsProfile.Workspace, error) {
+func (sd *LogAnalyticsServiceDiscovery) GetWorkspace(ctx context.Context, resourceId string) (*armoperationalinsights.Workspace, error) {
 	var serviceDiscoveryCacheDuration *time.Duration
 	cacheKey := ""
 	prober := sd.prober
@@ -53,29 +56,29 @@ func (sd *LogAnalyticsServiceDiscovery) GetWorkspace(ctx context.Context, resour
 
 		// try cache
 		if v, ok := prober.cache.Get(cacheKey); ok {
-			if cacheData, ok := v.(operationalinsightsProfile.Workspace); ok {
+			if cacheData, ok := v.(*armoperationalinsights.Workspace); ok {
 				fmt.Println("from cache: " + resourceId)
-				return &cacheData, nil
+				return cacheData, nil
 			}
 		}
 	}
 
-	resourceInfo, err := azureCommon.ParseResourceId(resourceId)
+	resourceInfo, err := armclient.ParseResourceId(resourceId)
 	if err != nil {
 		return nil, err
 	}
 
-	workspace, err := sd.ResourcesClient(resourceInfo.Subscription).Get(ctx, resourceInfo.ResourceGroup, resourceInfo.ResourceName)
+	workspace, err := sd.ResourcesClient(resourceInfo.Subscription).Get(ctx, resourceInfo.ResourceGroup, resourceInfo.ResourceName, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	if serviceDiscoveryCacheDuration != nil {
 		fmt.Println("to cache: " + resourceId)
-		prober.cache.Set(cacheKey, workspace, *serviceDiscoveryCacheDuration)
+		prober.cache.Set(cacheKey, &workspace.Workspace, *serviceDiscoveryCacheDuration)
 	}
 
-	return &workspace, nil
+	return &workspace.Workspace, nil
 }
 
 func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
@@ -136,18 +139,20 @@ func (sd *LogAnalyticsServiceDiscovery) requestWorkspacesFromAzure(logger *log.E
 			"subscription": subscriptionId,
 		})
 
-		list, err := sd.ResourcesClient(subscriptionId).List(prober.ctx)
-		if err != nil {
-			subscriptionLogger.Error(err)
-			panic(LogAnalyticsPanicStop{Message: err.Error()})
-		}
+		pager := sd.ResourcesClient(subscriptionId).NewListPager(nil)
+		for pager.More() {
+			result, err := pager.NextPage(prober.ctx)
+			if err != nil {
+				subscriptionLogger.Panic(err)
+			}
 
-		for _, val := range *list.Value {
-			if val.CustomerID != nil {
-				prober.workspaceList = append(
-					prober.workspaceList,
-					to.String(val.CustomerID),
-				)
+			for _, workspace := range result.Value {
+				if workspace.Properties.CustomerID != nil {
+					prober.workspaceList = append(
+						prober.workspaceList,
+						to.String(workspace.Properties.CustomerID),
+					)
+				}
 			}
 		}
 	}

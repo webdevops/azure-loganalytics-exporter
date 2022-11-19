@@ -11,17 +11,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/operationalinsights/v1/operationalinsights"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
-	azureCommon "github.com/webdevops/go-common/azure"
-	"github.com/webdevops/go-common/prometheus/azuretracing"
+	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/azuresdk/loganalytics"
 	"github.com/webdevops/go-common/prometheus/kusto"
+	"github.com/webdevops/go-common/utils/to"
 
 	"github.com/webdevops/azure-loganalytics-exporter/config"
 )
@@ -37,7 +35,7 @@ type (
 		UserAgent   string
 
 		Azure struct {
-			Client *azureCommon.Client
+			Client *armclient.ArmClient
 		}
 
 		workspaceList []string
@@ -143,34 +141,12 @@ func (p *LogAnalyticsProber) AddWorkspaces(workspaces ...string) {
 				p.logger.Panic(err)
 			}
 
-			workspace = to.String(workspaceResource.CustomerID)
+			workspace = to.String(workspaceResource.Properties.CustomerID)
 		}
 
 		p.workspaceList = append(p.workspaceList, workspace)
 	}
 
-}
-
-func (p *LogAnalyticsProber) LogAnalyticsQueryClient() operationalinsights.QueryClient {
-	// Create and authorize operationalinsights client
-	client := operationalinsights.NewQueryClientWithBaseURI(p.Azure.Client.Environment.ResourceIdentifiers.OperationalInsights + OperationInsightsWorkspaceUrlSuffix)
-	if err := client.AddToUserAgent(p.UserAgent); err != nil {
-		log.Panic(err)
-	}
-	client.Authorizer = p.Azure.Client.GetAuthorizerWithResource(p.Azure.Client.Environment.ResourceIdentifiers.OperationalInsights)
-
-	requestCallback := func(r *http.Request) (*http.Request, error) {
-		r.Header.Add("cache-control", "no-cache")
-		return r, nil
-	}
-
-	azuretracing.DecorateAzureAutoRestClientWithCallbacks(
-		&client.Client,
-		&requestCallback,
-		nil,
-	)
-
-	return client
 }
 
 func (p *LogAnalyticsProber) Run() {
@@ -249,8 +225,6 @@ func (p *LogAnalyticsProber) Run() {
 }
 
 func (p *LogAnalyticsProber) executeQueries() error {
-	queryClient := p.LogAnalyticsQueryClient()
-
 	for _, queryRow := range p.QueryConfig.Queries {
 		queryConfig := queryRow
 
@@ -290,7 +264,6 @@ func (p *LogAnalyticsProber) executeQueries() error {
 					p.sendQueryToMultipleWorkspace(
 						contextLogger,
 						workspaceList,
-						queryClient,
 						queryConfig,
 						resultChannel,
 					)
@@ -309,7 +282,6 @@ func (p *LogAnalyticsProber) executeQueries() error {
 						p.sendQueryToSingleWorkspace(
 							contextLogger,
 							workspaceId,
-							queryClient,
 							queryConfig,
 							resultChannel,
 						)
@@ -363,18 +335,18 @@ func (p *LogAnalyticsProber) executeQueries() error {
 	return nil
 }
 
-func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, workspaces []string, queryClient operationalinsights.QueryClient, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, workspaces []string, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
 	workspaceLogger := logger.WithField("workspaceId", workspaces)
 
-	// Set options
-	queryBody := operationalinsights.QueryBody{
-		Query:      &queryConfig.Query,
-		Timespan:   queryConfig.Timespan,
-		Workspaces: &workspaces,
-	}
-
 	workspaceLogger.WithField("query", queryConfig.Query).Debug("send query to loganaltyics workspaces")
-	var queryResults, queryErr = queryClient.Execute(p.ctx, workspaces[0], queryBody)
+	queryResults, queryErr := loganalytics.ExecuteQuery(
+		p.ctx,
+		p.Azure.Client,
+		workspaces[0],
+		queryConfig.Query,
+		queryConfig.Timespan,
+		&workspaces,
+	)
 	if queryErr != nil {
 		workspaceLogger.Error(queryErr.Error())
 		result <- LogAnalyticsProbeResult{
@@ -403,7 +375,7 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, wor
 				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
 					// inject workspaceId
 					for num := range metric {
-						metric[num].Labels["workspaceTable"] = to.String(table.Name)
+						metric[num].Labels["workspaceTable"] = table.Name
 					}
 
 					result <- LogAnalyticsProbeResult{
@@ -419,21 +391,18 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, wor
 	logger.Debug("metrics parsed")
 }
 
-func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *log.Entry, workspaceId string, queryClient operationalinsights.QueryClient, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *log.Entry, workspaceId string, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
 	workspaceLogger := logger.WithField("workspaceId", workspaceId)
 
-	// Set options
-	workspaces := []string{
-		workspaceId,
-	}
-	queryBody := operationalinsights.QueryBody{
-		Query:      &queryConfig.Query,
-		Timespan:   queryConfig.Timespan,
-		Workspaces: &workspaces,
-	}
-
 	workspaceLogger.WithField("query", queryConfig.Query).Debug("send query to loganaltyics workspace")
-	var queryResults, queryErr = queryClient.Execute(p.ctx, workspaceId, queryBody)
+	queryResults, queryErr := loganalytics.ExecuteQuery(
+		p.ctx,
+		p.Azure.Client,
+		workspaceId,
+		queryConfig.Query,
+		queryConfig.Timespan,
+		nil,
+	)
 	if queryErr != nil {
 		workspaceLogger.Error(queryErr.Error())
 		result <- LogAnalyticsProbeResult{
@@ -462,7 +431,7 @@ func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *log.Entry, works
 				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
 					// inject workspaceId
 					for num := range metric {
-						metric[num].Labels["workspaceTable"] = to.String(table.Name)
+						metric[num].Labels["workspaceTable"] = table.Name
 						metric[num].Labels["workspaceID"] = workspaceId
 					}
 
@@ -490,8 +459,4 @@ func (p *LogAnalyticsProber) parseCacheTime(r *http.Request) (time.Duration, err
 	}
 
 	return 0, nil
-}
-
-func (p *LogAnalyticsProber) decorateAzureAutoRest(client *autorest.Client) {
-	p.Azure.Client.DecorateAzureAutorest(client)
 }

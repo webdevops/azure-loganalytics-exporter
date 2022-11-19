@@ -97,7 +97,6 @@ available on `/metrics`
 | `azure_loganalytics_query_results`          | Number of results from query                                                   |
 | `azure_loganalytics_query_requests`         | Count of requests (eg paged subqueries) per query                              |
 
-
 ### AzureTracing metrics
 
 (with 22.2.0 and later)
