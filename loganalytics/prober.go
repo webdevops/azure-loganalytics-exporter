@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/monitor/azquery"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/go-common/azuresdk/armclient"
-	"github.com/webdevops/go-common/azuresdk/loganalytics"
 	"github.com/webdevops/go-common/prometheus/kusto"
 	"github.com/webdevops/go-common/utils/to"
 
@@ -335,18 +335,42 @@ func (p *LogAnalyticsProber) executeQueries() error {
 	return nil
 }
 
+func (p *LogAnalyticsProber) queryWorkspace(workspaces []string, queryConfig kusto.ConfigQuery) (azquery.LogsClientQueryWorkspaceResponse, error) {
+	clientOpts := azquery.LogsClientOptions{ClientOptions: *p.Azure.Client.NewAzCoreClientOptions()}
+	logsClient, err := azquery.NewLogsClient(p.Azure.Client.GetCred(), &clientOpts)
+	if err != nil {
+		return azquery.LogsClientQueryWorkspaceResponse{}, err
+	}
+
+	var timespan *azquery.TimeInterval
+	if queryConfig.Timespan != nil {
+		tmp := azquery.TimeInterval(*queryConfig.Timespan)
+		timespan = &tmp
+	}
+
+	additionalWorkspaces := []*string{}
+	if len(workspaces) > 1 {
+		for _, workspaceId := range workspaces[1:] {
+			additionalWorkspaces = append(additionalWorkspaces, to.StringPtr(workspaceId))
+		}
+	}
+
+	opts := azquery.LogsClientQueryWorkspaceOptions{}
+	queryBody := azquery.Body{
+		Query:                to.StringPtr(queryConfig.Query),
+		Timespan:             timespan,
+		AdditionalWorkspaces: additionalWorkspaces,
+	}
+
+	return logsClient.QueryWorkspace(p.ctx, workspaces[0], queryBody, &opts)
+}
+
 func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, workspaces []string, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
 	workspaceLogger := logger.WithField("workspaceId", workspaces)
 
 	workspaceLogger.WithField("query", queryConfig.Query).Debug("send query to loganaltyics workspaces")
-	queryResults, queryErr := loganalytics.ExecuteQuery(
-		p.ctx,
-		p.Azure.Client,
-		workspaces[0],
-		queryConfig.Query,
-		queryConfig.Timespan,
-		&workspaces,
-	)
+
+	queryResults, queryErr := p.queryWorkspace(workspaces, queryConfig)
 	if queryErr != nil {
 		workspaceLogger.Error(queryErr.Error())
 		result <- LogAnalyticsProbeResult{
@@ -356,7 +380,7 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, wor
 	}
 
 	logger.Debug("fetched query result")
-	resultTables := *queryResults.Tables
+	resultTables := queryResults.Tables
 
 	if len(resultTables) >= 1 {
 		for _, table := range resultTables {
@@ -365,17 +389,17 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *log.Entry, wor
 				continue
 			}
 
-			for _, v := range *table.Rows {
+			for _, v := range table.Rows {
 				resultRow := map[string]interface{}{}
 
-				for colNum, colName := range *resultTables[0].Columns {
+				for colNum, colName := range resultTables[0].Columns {
 					resultRow[to.String(colName.Name)] = v[colNum]
 				}
 
 				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
 					// inject workspaceId
 					for num := range metric {
-						metric[num].Labels["workspaceTable"] = table.Name
+						metric[num].Labels["workspaceTable"] = to.String(table.Name)
 					}
 
 					result <- LogAnalyticsProbeResult{
@@ -395,14 +419,8 @@ func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *log.Entry, works
 	workspaceLogger := logger.WithField("workspaceId", workspaceId)
 
 	workspaceLogger.WithField("query", queryConfig.Query).Debug("send query to loganaltyics workspace")
-	queryResults, queryErr := loganalytics.ExecuteQuery(
-		p.ctx,
-		p.Azure.Client,
-		workspaceId,
-		queryConfig.Query,
-		queryConfig.Timespan,
-		nil,
-	)
+
+	queryResults, queryErr := p.queryWorkspace([]string{workspaceId}, queryConfig)
 	if queryErr != nil {
 		workspaceLogger.Error(queryErr.Error())
 		result <- LogAnalyticsProbeResult{
@@ -412,7 +430,7 @@ func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *log.Entry, works
 	}
 
 	logger.Debug("fetched query result")
-	resultTables := *queryResults.Tables
+	resultTables := queryResults.Tables
 
 	if len(resultTables) >= 1 {
 		for _, table := range resultTables {
@@ -421,17 +439,17 @@ func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *log.Entry, works
 				continue
 			}
 
-			for _, v := range *table.Rows {
+			for _, v := range table.Rows {
 				resultRow := map[string]interface{}{}
 
-				for colNum, colName := range *resultTables[0].Columns {
+				for colNum, colName := range resultTables[0].Columns {
 					resultRow[to.String(colName.Name)] = v[colNum]
 				}
 
 				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
 					// inject workspaceId
 					for num := range metric {
-						metric[num].Labels["workspaceTable"] = table.Name
+						metric[num].Labels["workspaceTable"] = to.String(table.Name)
 						metric[num].Labels["workspaceID"] = workspaceId
 					}
 
