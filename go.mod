@@ -10,7 +10,6 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.15.1
 	github.com/remeh/sizedwaitgroup v1.0.0
-	github.com/sirupsen/logrus v1.9.0
 	github.com/webdevops/go-common v0.0.0-20230514184624-3c9d2cde95f8
 	go.uber.org/zap v1.24.0
 )
