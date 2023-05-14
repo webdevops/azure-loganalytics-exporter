@@ -1,6 +1,6 @@
 module github.com/webdevops/azure-loganalytics-exporter
 
-go 1.19
+go 1.20
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/monitor/azquery v1.1.0
