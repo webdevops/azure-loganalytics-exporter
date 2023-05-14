@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
-	log "github.com/sirupsen/logrus"
 	"github.com/webdevops/go-common/azuresdk/armclient"
 	"github.com/webdevops/go-common/utils/to"
+	"go.uber.org/zap"
 )
 
 type (
@@ -131,13 +131,11 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 	}
 }
 
-func (sd *LogAnalyticsServiceDiscovery) requestWorkspacesFromAzure(logger *log.Entry, subscriptionList []string) {
+func (sd *LogAnalyticsServiceDiscovery) requestWorkspacesFromAzure(logger *zap.SugaredLogger, subscriptionList []string) {
 	prober := sd.prober
 
 	for _, subscriptionId := range subscriptionList {
-		subscriptionLogger := logger.WithFields(log.Fields{
-			"subscription": subscriptionId,
-		})
+		subscriptionLogger := logger.With(zap.String("subscription", subscriptionId))
 
 		pager := sd.ResourcesClient(subscriptionId).NewListPager(nil)
 		for pager.More() {

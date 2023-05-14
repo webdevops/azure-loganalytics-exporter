@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 )
@@ -16,15 +16,12 @@ func handleProbePanic(w http.ResponseWriter, r *http.Request) {
 			// log entry already sent
 			msg := fmt.Sprintf("ERROR: %v", v.Message)
 			http.Error(w, msg, http.StatusBadRequest)
-		case *log.Entry:
-			// log entry already sent
-			http.Error(w, v.Message, http.StatusBadRequest)
 		case error:
-			log.Error(err)
+			logger.Error(err)
 			http.Error(w, v.Error(), http.StatusBadRequest)
 		default:
 			msg := fmt.Sprintf("%v", err)
-			log.WithField("request", r.RequestURI).Errorf(msg)
+			logger.With(zap.String("request", r.RequestURI)).Errorf(msg)
 			http.Error(w, msg, http.StatusBadRequest)
 		}
 	}
@@ -34,7 +31,7 @@ func handleProbeRequest(w http.ResponseWriter, r *http.Request) {
 	defer handleProbePanic(w, r)
 
 	prober := NewLogAnalyticsProber(w, r)
-	prober.AddWorkspaces(opts.Loganalytics.Workspace...)
+	prober.AddWorkspaces(Opts.Loganalytics.Workspace...)
 	prober.Run()
 }
 
@@ -60,9 +57,9 @@ func handleProbeSubscriptionRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func NewLogAnalyticsProber(w http.ResponseWriter, r *http.Request) *loganalytics.LogAnalyticsProber {
-	prober := loganalytics.NewLogAnalyticsProber(w, r, &concurrentWaitGroup)
+	prober := loganalytics.NewLogAnalyticsProber(logger, w, r, &concurrentWaitGroup)
 	prober.QueryConfig = Config
-	prober.Conf = opts
+	prober.Conf = Opts
 	prober.UserAgent = UserAgent + gitTag
 	prober.Azure.Client = AzureClient
 	prober.EnableCache(metricCache)
