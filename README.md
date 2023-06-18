@@ -78,12 +78,13 @@ uses dynamically passed workspaces via HTTP query parameter
 
 uses Azure service discovery to find all workspaces in one or multiple subscriptions
 
-| GET parameter          | Default                   | Required | Multiple | Description                                                          |
-|------------------------|---------------------------|----------|----------|----------------------------------------------------------------------|
-| `module`               |                           | no       | no       | Filter queries by module name                                        |
-| `subscription`         |                           | **yes**  | yes      | Uses all workspaces inside subscription                              |
-| `cache`                |                           | no       | no       | Use of internal metrics caching (time.Duration)                      |
-| `parallel`             | `$LOGANALYTICS_PARALLEL`  | no       | no       | Number (int) of how many workspaces can be queried at the same time  |
+| GET parameter  | Default                  | Required | Multiple | Description                                                                                                                              |
+|----------------|--------------------------|----------|----------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `module`       |                          | no       | no       | Filter queries by module name                                                                                                            |
+| `subscription` |                          | **yes**  | yes      | Uses all workspaces inside subscription                                                                                                  |
+| `filter`       |                          | no       | no       | Advanced filter for `resource \| {filter} \| project id, customerId=properties.customerId` ResoruceGraph query (available with `23.6.0`) |
+| `cache`        |                          | no       | no       | Use of internal metrics caching (time.Duration)                                                                                          |
+| `parallel`     | `$LOGANALYTICS_PARALLEL` | no       | no       | Number (int) of how many workspaces can be queried at the same time                                                                      |
 
 ## Global metrics
 

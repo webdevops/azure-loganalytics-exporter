@@ -10,7 +10,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
 	"github.com/webdevops/go-common/azuresdk/armclient"
-	"github.com/webdevops/go-common/utils/to"
 	"go.uber.org/zap"
 )
 
@@ -100,7 +99,7 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 		serviceDiscoveryCacheDuration = prober.Conf.Azure.ServiceDiscovery.CacheDuration
 		cacheKey = fmt.Sprintf(
 			"sd:%x",
-			string(sha1.New().Sum([]byte(fmt.Sprintf("%v", subscriptionList)))),
+			string(sha1.New().Sum([]byte(fmt.Sprintf("%v:%v", subscriptionList, prober.request.URL.String())))),
 		) // #nosec
 
 		// try cache
@@ -118,7 +117,7 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 	}
 
 	contextLogger.Debug("requesting list for workspaces via Azure API")
-	sd.requestWorkspacesFromAzure(contextLogger, subscriptionList)
+	sd.findWorkspaces(contextLogger, subscriptionList)
 
 	// store to cache (if enabeld)
 	if serviceDiscoveryCacheDuration != nil {
@@ -131,28 +130,33 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 	}
 }
 
-func (sd *LogAnalyticsServiceDiscovery) requestWorkspacesFromAzure(logger *zap.SugaredLogger, subscriptionList []string) {
+func (sd *LogAnalyticsServiceDiscovery) findWorkspaces(logger *zap.SugaredLogger, subscriptionList []string) {
 	prober := sd.prober
 
-	for _, subscriptionId := range subscriptionList {
-		subscriptionLogger := logger.With(zap.String("subscription", subscriptionId))
-
-		pager := sd.ResourcesClient(subscriptionId).NewListPager(nil)
-		for pager.More() {
-			result, err := pager.NextPage(prober.ctx)
-			if err != nil {
-				subscriptionLogger.Panic(err)
-			}
-
-			for _, workspace := range result.Value {
-				if workspace.Properties.CustomerID != nil {
-					prober.workspaceList = append(
-						prober.workspaceList,
-						to.String(workspace.Properties.CustomerID),
-					)
-				}
-			}
+	query := "resources \n"
+	query += "| where type =~ \"Microsoft.OperationalInsights/workspaces\" \n"
+	if filter := prober.request.URL.Query().Get("filter"); len(filter) > 0 {
+		filter = strings.TrimSpace(filter)
+		filter = strings.TrimLeft(filter, "|")
+		if len(filter) >= 1 {
+			query += fmt.Sprintf("| %s \n", filter)
 		}
 	}
+	query += "| project id, customerId=properties.customerId"
 
+	result, err := prober.Azure.Client.ExecuteResourceGraphQuery(
+		prober.ctx,
+		subscriptionList,
+		query,
+	)
+	if err != nil {
+		logger.Panic(err)
+	}
+
+	for _, row := range result {
+		prober.workspaceList = append(
+			prober.workspaceList,
+			row["customerId"].(string),
+		)
+	}
 }
