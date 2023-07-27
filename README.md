@@ -85,18 +85,20 @@ uses Azure service discovery to find all workspaces in one or multiple subscript
 | `filter`       |                          | no       | no       | Advanced filter for `resource \| {filter} \| project id, customerId=properties.customerId` ResoruceGraph query (available with `23.6.0`) |
 | `cache`        |                          | no       | no       | Use of internal metrics caching (time.Duration)                                                                                          |
 | `parallel`     | `$LOGANALYTICS_PARALLEL` | no       | no       | Number (int) of how many workspaces can be queried at the same time                                                                      |
+| `optional`     | `false`                  | no       | no       | Do not fail, if service discovery did not find any workspaces                                                                            |
 
 ## Global metrics
 
 available on `/metrics`
 
-| Metric                                      | Description                                                                    |
-|---------------------------------------------|--------------------------------------------------------------------------------|
-| `azure_loganalytics_status`                 | Status if query was successfull (per workspace, module, metric)                |
-| `azure_loganalytics_last_query_successfull` | Timestamp of last successfull query (per workspace, module, metric)            |
-| `azure_loganalytics_query_time`             | Summary metric about query execution time (incl. all subqueries)               |
-| `azure_loganalytics_query_results`          | Number of results from query                                                   |
-| `azure_loganalytics_query_requests`         | Count of requests (eg paged subqueries) per query                              |
+| Metric                                      | Description                                                         |
+|---------------------------------------------|---------------------------------------------------------------------|
+| `azure_loganalytics_status`                 | Status if query was successfull (per workspace, module, metric)     |
+| `azure_loganalytics_last_query_successfull` | Timestamp of last successfull query (per workspace, module, metric) |
+| `azure_loganalytics_query_time`             | Summary metric about query execution time (incl. all subqueries)    |
+| `azure_loganalytics_query_results`          | Number of results from query                                        |
+| `azure_loganalytics_query_requests`         | Count of requests (eg paged subqueries) per query                   |
+| `azure_loganalytics_workspace_query_count`  | Count of discovered workspaces per module                           |
 
 ### AzureTracing metrics
 

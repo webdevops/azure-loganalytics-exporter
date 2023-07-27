@@ -8,6 +8,7 @@ var (
 	prometheusQueryRequests        *prometheus.CounterVec
 	prometheusQueryStatus          *prometheus.GaugeVec
 	prometheusQueryLastSuccessfull *prometheus.GaugeVec
+	prometheusQueryWorkspaceCount  *prometheus.GaugeVec
 )
 
 func InitGlobalMetrics() {
@@ -72,5 +73,14 @@ func InitGlobalMetrics() {
 			"metric",
 		},
 	)
-	prometheus.MustRegister(prometheusQueryLastSuccessfull)
+	prometheusQueryWorkspaceCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azure_loganalytics_workspace_query_count",
+			Help: "Azure loganalytics workspace query count",
+		},
+		[]string{
+			"module",
+		},
+	)
+	prometheus.MustRegister(prometheusQueryWorkspaceCount)
 }
