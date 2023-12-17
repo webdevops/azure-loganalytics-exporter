@@ -27,7 +27,7 @@ import (
 const (
 	Author = "webdevops.io"
 
-	UserAgent = "azure-loganalytics-exporter/"
+	UserAgent = "az-log-exporter/"
 )
 
 var (
