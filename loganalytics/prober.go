@@ -54,6 +54,7 @@ type (
 
 		config struct {
 			moduleName    string
+			optional      bool
 			cacheEnabled  bool
 			cacheDuration *time.Duration
 			cacheKey      *string
@@ -100,6 +101,7 @@ func NewLogAnalyticsProber(logger *zap.SugaredLogger, w http.ResponseWriter, r *
 
 func (p *LogAnalyticsProber) Init() {
 	p.config.moduleName = p.request.URL.Query().Get("module")
+	p.config.optional = p.request.URL.Query().Get("optional") == "true"
 
 	p.logger = p.logger.With(zap.String("module", p.config.moduleName))
 
@@ -174,6 +176,12 @@ func (p *LogAnalyticsProber) Run() {
 
 		if p.ServiceDiscovery.enabled {
 			p.ServiceDiscovery.ServiceDiscovery()
+		}
+
+		prometheusQueryWorkspaceCount.With(prometheus.Labels{"module": p.config.moduleName}).Set(float64(len(p.workspaceList)))
+
+		if p.config.optional && len(p.workspaceList) == 0 {
+			return
 		}
 
 		err := p.executeQueries()
