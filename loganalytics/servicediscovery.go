@@ -99,8 +99,8 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 		serviceDiscoveryCacheDuration = prober.Conf.Azure.ServiceDiscovery.CacheDuration
 		cacheKey = fmt.Sprintf(
 			"sd:%x",
-			string(sha1.New().Sum([]byte(fmt.Sprintf("%v:%v", subscriptionList, prober.request.URL.String())))),
-		) // #nosec
+			string(sha1.New().Sum([]byte(fmt.Sprintf("%v:%v", subscriptionList, prober.request.URL.String())))), //nolint:gosec
+		)
 
 		// try cache
 		if v, ok := prober.cache.Get(cacheKey); ok {

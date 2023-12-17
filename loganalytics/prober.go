@@ -115,9 +115,9 @@ func (p *LogAnalyticsProber) Init() {
 		p.config.cacheKey = to.StringPtr(
 			fmt.Sprintf(
 				"metrics:%x",
-				string(sha1.New().Sum([]byte(p.request.RequestURI))),
+				string(sha1.New().Sum([]byte(p.request.RequestURI))), //nolint:gosec
 			),
-		) // #nosec
+		)
 	}
 }
 
