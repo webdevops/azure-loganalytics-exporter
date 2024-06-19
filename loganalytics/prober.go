@@ -174,6 +174,7 @@ func (p *LogAnalyticsProber) translateWorkspaceIntoConfig(val string) WorkspaceC
 			workspaceConfig.Labels["workspaceResourceID"] = workspaceConfig.ResourceID
 			workspaceConfig.Labels["workspaceResourceGroup"] = resourceInfo.ResourceGroup
 			workspaceConfig.Labels["workspaceResourceName"] = resourceInfo.ResourceName
+			workspaceConfig.Labels["workspaceLocation"] = to.String(workspaceResource.Location)
 
 			// add custom labels
 			workspaceConfig.Labels = p.tagManagerConfig.AddResourceTagsToPrometheusLabels(
