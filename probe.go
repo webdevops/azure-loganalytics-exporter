@@ -61,7 +61,7 @@ func NewLogAnalyticsProber(w http.ResponseWriter, r *http.Request) *loganalytics
 	prober.QueryConfig = Config
 	prober.Conf = Opts
 	prober.UserAgent = UserAgent + gitTag
-	prober.Azure.Client = AzureClient
+	prober.SetAzureClient(AzureClient)
 	prober.EnableCache(metricCache)
 
 	return prober

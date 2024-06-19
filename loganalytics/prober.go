@@ -129,6 +129,10 @@ func (p *LogAnalyticsProber) Init() {
 			),
 		)
 	}
+}
+
+func (p *LogAnalyticsProber) SetAzureClient(client *armclient.ArmClient) {
+	p.Azure.Client = client
 
 	tagManagerConfig, err := p.Azure.Client.TagManager.ParseTagConfig(p.Conf.Azure.ResourceTags)
 	if err != nil {
