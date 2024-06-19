@@ -58,6 +58,8 @@ func main() {
 	logger.Info(string(Opts.GetJson()))
 	loganalytics.InitGlobalMetrics()
 
+	initSystem()
+
 	concurrentWaitGroup = sizedwaitgroup.New(Opts.Loganalytics.Concurrency)
 
 	metricCache = cache.New(120*time.Second, 60*time.Second)
