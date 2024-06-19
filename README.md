@@ -18,14 +18,14 @@ Usage:
 
 Application Options:
       --log.debug                     debug mode [$LOG_DEBUG]
-      --log.trace                     trace mode [$LOG_TRACE]
+      --log.devel                     development mode [$LOG_DEVEL]
       --log.json                      Switch log output to json format [$LOG_JSON]
       --azure.environment=            Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
-      --azure.servicediscovery.cache= Duration for caching Azure ServiceDiscovery of workspaces to reduce API calls
-                                      (time.Duration) (default: 30m) [$AZURE_SERVICEDISCOVERY_CACHE]
+      --azure.servicediscovery.cache= Duration for caching Azure ServiceDiscovery of workspaces to reduce API calls (time.Duration)
+                                      (default: 30m) [$AZURE_SERVICEDISCOVERY_CACHE]
+      --azure.resource-tag=           Azure Resource tags (space delimiter) (default: owner) [$AZURE_RESOURCE_TAG]
       --loganalytics.workspace=       Loganalytics workspace IDs [$LOGANALYTICS_WORKSPACE]
-      --loganalytics.concurrency=     Specifies how many workspaces should be queried concurrently (default: 5)
-                                      [$LOGANALYTICS_CONCURRENCY]
+      --loganalytics.concurrency=     Specifies how many workspaces should be queried concurrently (default: 5) [$LOGANALYTICS_CONCURRENCY]
   -c, --config=                       Config path [$CONFIG]
       --server.bind=                  Server address (default: :8080) [$SERVER_BIND]
       --server.timeout.read=          Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
