@@ -144,10 +144,14 @@ func (sd *LogAnalyticsServiceDiscovery) findWorkspaces(logger *zap.SugaredLogger
 	}
 	query += "| project id, customerId=properties.customerId"
 
+	opts := armclient.ResourceGraphOptions{
+		Subscriptions: subscriptionList,
+	}
+
 	result, err := prober.Azure.Client.ExecuteResourceGraphQuery(
 		prober.ctx,
-		subscriptionList,
 		query,
+		opts,
 	)
 	if err != nil {
 		logger.Panic(err)
