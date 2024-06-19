@@ -159,6 +159,8 @@ func (p *LogAnalyticsProber) translateWorkspaceIntoConfig(val string) WorkspaceC
 		Labels: map[string]string{},
 	}
 
+	val = strings.TrimSpace(val)
+
 	if strings.HasPrefix(val, "/subscriptions/") {
 		workspaceResource, err := p.ServiceDiscovery.GetWorkspace(p.ctx, val)
 		if err != nil {
@@ -169,9 +171,9 @@ func (p *LogAnalyticsProber) translateWorkspaceIntoConfig(val string) WorkspaceC
 		workspaceConfig.CustomerID = to.String(workspaceResource.Properties.CustomerID)
 
 		if resourceInfo, err := armclient.ParseResourceId(workspaceConfig.ResourceID); err == nil {
-			workspaceConfig.Labels["resourceID"] = workspaceConfig.ResourceID
-			workspaceConfig.Labels["resourceGroup"] = resourceInfo.ResourceGroup
-			workspaceConfig.Labels["resourceName"] = resourceInfo.ResourceName
+			workspaceConfig.Labels["workspaceResourceID"] = workspaceConfig.ResourceID
+			workspaceConfig.Labels["workspaceResourceGroup"] = resourceInfo.ResourceGroup
+			workspaceConfig.Labels["workspaceResourceName"] = resourceInfo.ResourceName
 
 			// add custom labels
 			workspaceConfig.Labels = p.tagManagerConfig.AddResourceTagsToPrometheusLabels(
@@ -507,8 +509,10 @@ func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogge
 						metric[num].Labels["workspaceID"] = workspaceConfig.CustomerID
 
 						// add labels from resource config
-						for labelName, labelValue := range workspaceConfig.Labels {
-							metric[num].Labels[labelName] = labelValue
+						if workspaceConfig.Labels != nil {
+							for labelName, labelValue := range workspaceConfig.Labels {
+								metric[num].Labels[labelName] = labelValue
+							}
 						}
 					}
 
