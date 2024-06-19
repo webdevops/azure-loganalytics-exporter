@@ -158,9 +158,6 @@ func (sd *LogAnalyticsServiceDiscovery) findWorkspaces(logger *zap.SugaredLogger
 	}
 
 	for _, row := range result {
-		prober.workspaceList = append(
-			prober.workspaceList,
-			row["customerId"].(string),
-		)
+		prober.AddWorkspaces(row["id"].(string))
 	}
 }

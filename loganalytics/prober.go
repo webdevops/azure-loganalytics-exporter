@@ -38,7 +38,9 @@ type (
 			Client *armclient.ArmClient
 		}
 
-		workspaceList []string
+		tagManagerConfig *armclient.ResourceTagManager
+
+		workspaceList []WorkspaceConfig
 
 		request  *http.Request
 		response http.ResponseWriter
@@ -65,6 +67,12 @@ type (
 		concurrencyWaitGroup *sizedwaitgroup.SizedWaitGroup
 	}
 
+	WorkspaceConfig struct {
+		ResourceID string
+		CustomerID string
+		Labels     map[string]string
+	}
+
 	LogAnalyticsProbeResult struct {
 		WorkspaceId string
 		Name        string
@@ -80,7 +88,7 @@ type (
 func NewLogAnalyticsProber(logger *zap.SugaredLogger, w http.ResponseWriter, r *http.Request, concurrencyWaitGroup *sizedwaitgroup.SizedWaitGroup) *LogAnalyticsProber {
 	prober := LogAnalyticsProber{}
 	prober.logger = logger
-	prober.workspaceList = []string{}
+	prober.workspaceList = []WorkspaceConfig{}
 	prober.request = r
 	prober.response = w
 	prober.ctx = context.Background()
@@ -121,6 +129,13 @@ func (p *LogAnalyticsProber) Init() {
 			),
 		)
 	}
+
+	tagManagerConfig, err := p.Azure.Client.TagManager.ParseTagConfig(p.Conf.Azure.ResourceTags)
+	if err != nil {
+		p.logger.Fatal(err)
+	}
+
+	p.tagManagerConfig = tagManagerConfig
 }
 
 func (p *LogAnalyticsProber) EnableCache(cache *cache.Cache) {
@@ -135,21 +150,44 @@ func (p *LogAnalyticsProber) GetPrometheusRegistry() *prometheus.Registry {
 	return p.registry
 }
 
-func (p *LogAnalyticsProber) AddWorkspaces(workspaces ...string) {
-	for _, workspace := range workspaces {
-
-		if strings.HasPrefix(workspace, "/subscriptions/") {
-			workspaceResource, err := p.ServiceDiscovery.GetWorkspace(p.ctx, workspace)
-			if err != nil {
-				p.logger.Panic(err)
-			}
-
-			workspace = to.String(workspaceResource.Properties.CustomerID)
-		}
-
-		p.workspaceList = append(p.workspaceList, workspace)
+func (p *LogAnalyticsProber) translateWorkspaceIntoConfig(val string) WorkspaceConfig {
+	workspaceConfig := WorkspaceConfig{
+		Labels: map[string]string{},
 	}
 
+	if strings.HasPrefix(val, "/subscriptions/") {
+		workspaceResource, err := p.ServiceDiscovery.GetWorkspace(p.ctx, val)
+		if err != nil {
+			p.logger.Panic(err)
+		}
+
+		workspaceConfig.ResourceID = to.String(workspaceResource.ID)
+		workspaceConfig.CustomerID = to.String(workspaceResource.Properties.CustomerID)
+
+		if resourceInfo, err := armclient.ParseResourceId(workspaceConfig.ResourceID); err == nil {
+			workspaceConfig.Labels["resourceID"] = workspaceConfig.ResourceID
+			workspaceConfig.Labels["resourceGroup"] = resourceInfo.ResourceGroup
+			workspaceConfig.Labels["resourceName"] = resourceInfo.ResourceName
+
+			// add custom labels
+			workspaceConfig.Labels = p.tagManagerConfig.AddResourceTagsToPrometheusLabels(
+				p.ctx,
+				workspaceConfig.Labels,
+				workspaceConfig.ResourceID,
+			)
+		}
+	} else {
+		// no resource id, must be a customer id
+		workspaceConfig.CustomerID = val
+	}
+
+	return workspaceConfig
+}
+
+func (p *LogAnalyticsProber) AddWorkspaces(workspaces ...string) {
+	for _, item := range workspaces {
+		p.workspaceList = append(p.workspaceList, p.translateWorkspaceIntoConfig(item))
+	}
 }
 
 func (p *LogAnalyticsProber) Run() {
@@ -239,7 +277,10 @@ func (p *LogAnalyticsProber) executeQueries() error {
 
 		workspaceList := p.workspaceList
 		if queryRow.Workspaces != nil && len(*queryRow.Workspaces) >= 1 {
-			workspaceList = *queryRow.Workspaces
+			workspaceList = []WorkspaceConfig{}
+			for _, workspace := range *queryRow.Workspaces {
+				workspaceList = append(workspaceList, p.translateWorkspaceIntoConfig(workspace))
+			}
 		}
 
 		if len(workspaceList) == 0 {
@@ -279,9 +320,9 @@ func (p *LogAnalyticsProber) executeQueries() error {
 				}()
 			case "", "single":
 				for _, row := range workspaceList {
-					workspaceId := row
+					workspaceConfig := row
 					// Run the query and get the results
-					prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceId, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
+					prometheusQueryRequests.With(prometheus.Labels{"workspaceID": workspaceConfig.CustomerID, "module": p.config.moduleName, "metric": queryConfig.Metric}).Inc()
 
 					wgProbes.Add(1)
 					p.concurrencyWaitGroup.Add()
@@ -290,7 +331,7 @@ func (p *LogAnalyticsProber) executeQueries() error {
 						defer p.concurrencyWaitGroup.Done()
 						p.sendQueryToSingleWorkspace(
 							contextLogger,
-							workspaceId,
+							workspaceConfig,
 							queryConfig,
 							resultChannel,
 						)
@@ -344,7 +385,7 @@ func (p *LogAnalyticsProber) executeQueries() error {
 	return nil
 }
 
-func (p *LogAnalyticsProber) queryWorkspace(workspaces []string, queryConfig kusto.ConfigQuery) (azquery.LogsClientQueryWorkspaceResponse, error) {
+func (p *LogAnalyticsProber) queryWorkspace(workspaces []WorkspaceConfig, queryConfig kusto.ConfigQuery) (azquery.LogsClientQueryWorkspaceResponse, error) {
 	clientOpts := azquery.LogsClientOptions{ClientOptions: *p.Azure.Client.NewAzCoreClientOptions()}
 	logsClient, err := azquery.NewLogsClient(p.Azure.Client.GetCred(), &clientOpts)
 	if err != nil {
@@ -359,8 +400,8 @@ func (p *LogAnalyticsProber) queryWorkspace(workspaces []string, queryConfig kus
 
 	additionalWorkspaces := []*string{}
 	if len(workspaces) > 1 {
-		for _, workspaceId := range workspaces[1:] {
-			additionalWorkspaces = append(additionalWorkspaces, to.StringPtr(workspaceId))
+		for _, workspaceConfig := range workspaces[1:] {
+			additionalWorkspaces = append(additionalWorkspaces, to.StringPtr(workspaceConfig.CustomerID))
 		}
 	}
 
@@ -371,13 +412,13 @@ func (p *LogAnalyticsProber) queryWorkspace(workspaces []string, queryConfig kus
 		AdditionalWorkspaces: additionalWorkspaces,
 	}
 
-	return logsClient.QueryWorkspace(p.ctx, workspaces[0], queryBody, &opts)
+	return logsClient.QueryWorkspace(p.ctx, workspaces[0].CustomerID, queryBody, &opts)
 }
 
-func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLogger, workspaces []string, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLogger, workspaces []WorkspaceConfig, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
 	workspaceLogger := logger.With(zap.Any("workspaceId", workspaces))
 
-	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to loganaltyics workspaces")
+	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspaces")
 
 	queryResults, queryErr := p.queryWorkspace(workspaces, queryConfig)
 	if queryErr != nil {
@@ -424,12 +465,12 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLog
 	logger.Debug("metrics parsed")
 }
 
-func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogger, workspaceId string, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
-	workspaceLogger := logger.With(zap.String("workspaceId", workspaceId))
+func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogger, workspaceConfig WorkspaceConfig, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+	workspaceLogger := logger.With(zap.String("workspaceId", workspaceConfig.CustomerID))
 
-	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to loganaltyics workspace")
+	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspace")
 
-	queryResults, queryErr := p.queryWorkspace([]string{workspaceId}, queryConfig)
+	queryResults, queryErr := p.queryWorkspace([]WorkspaceConfig{workspaceConfig}, queryConfig)
 	if queryErr != nil {
 		workspaceLogger.Error(queryErr.Error())
 		result <- LogAnalyticsProbeResult{
@@ -459,11 +500,16 @@ func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogge
 					// inject workspaceId
 					for num := range metric {
 						metric[num].Labels["workspaceTable"] = to.String(table.Name)
-						metric[num].Labels["workspaceID"] = workspaceId
+						metric[num].Labels["workspaceID"] = workspaceConfig.CustomerID
+
+						// add labels from resource config
+						for labelName, labelValue := range workspaceConfig.Labels {
+							metric[num].Labels[labelName] = labelValue
+						}
 					}
 
 					result <- LogAnalyticsProbeResult{
-						WorkspaceId: workspaceId,
+						WorkspaceId: workspaceConfig.CustomerID,
 						Name:        metricName,
 						Metrics:     metric,
 					}
