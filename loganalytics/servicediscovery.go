@@ -73,7 +73,6 @@ func (sd *LogAnalyticsServiceDiscovery) GetWorkspace(ctx context.Context, resour
 	}
 
 	if serviceDiscoveryCacheDuration != nil {
-		fmt.Println("to cache: " + resourceId)
 		prober.cache.Set(cacheKey, &workspace.Workspace, *serviceDiscoveryCacheDuration)
 	}
 
