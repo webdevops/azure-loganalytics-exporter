@@ -23,3 +23,11 @@ func ParamsGetListRequired(params url.Values, name string) (list []string, err e
 
 	return
 }
+
+// canonicalizeAzureLocation tries to get canonicalized azure location names
+func canonicalizeAzureLocation(val string) string {
+	val = strings.ToLower(val)
+	// transform "west europe" into "westeurope"
+	val = strings.ReplaceAll(val, " ", "")
+	return val
+}
