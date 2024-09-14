@@ -25,7 +25,7 @@ jobs:
           check-latest: true
 
       - name: Run Golangci lint
-        uses: golangci/golangci-lint-action@v5
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
           args: --print-resources-usage
@@ -92,7 +92,7 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: ${{ inputs.publish && 'Build and push' || 'Build' }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./${{ matrix.Dockerfile }}
