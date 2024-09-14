@@ -56,9 +56,8 @@ func main() {
 
 	logger.Infof("starting azure-loganalytics-exporter v%s (%s; %s; by %v)", gitTag, gitCommit, runtime.Version(), Author)
 	logger.Info(string(Opts.GetJson()))
-	loganalytics.InitGlobalMetrics()
-
 	initSystem()
+	loganalytics.InitGlobalMetrics()
 
 	concurrentWaitGroup = sizedwaitgroup.New(Opts.Loganalytics.Concurrency)
 
