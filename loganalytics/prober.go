@@ -392,7 +392,7 @@ func (p *LogAnalyticsProber) executeQueries() error {
 	return nil
 }
 
-func (p *LogAnalyticsProber) queryWorkspace(workspaces []WorkspaceConfig, queryConfig kusto.ConfigQuery) (azquery.LogsClientQueryWorkspaceResponse, error) {
+func (p *LogAnalyticsProber) queryWorkspace(workspaces []WorkspaceConfig, queryConfig kusto.Query) (azquery.LogsClientQueryWorkspaceResponse, error) {
 	clientOpts := azquery.LogsClientOptions{ClientOptions: *p.Azure.Client.NewAzCoreClientOptions()}
 	logsClient, err := azquery.NewLogsClient(p.Azure.Client.GetCred(), &clientOpts)
 	if err != nil {
@@ -422,7 +422,7 @@ func (p *LogAnalyticsProber) queryWorkspace(workspaces []WorkspaceConfig, queryC
 	return logsClient.QueryWorkspace(p.ctx, workspaces[0].CustomerID, queryBody, &opts)
 }
 
-func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLogger, workspaces []WorkspaceConfig, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLogger, workspaces []WorkspaceConfig, queryConfig kusto.Query, result chan<- LogAnalyticsProbeResult) {
 	workspaceLogger := logger.With(zap.Any("workspaceId", workspaces))
 
 	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspaces")
@@ -453,7 +453,7 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLog
 					resultRow[to.String(colName.Name)] = v[colNum]
 				}
 
-				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
+				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, *queryConfig.QueryMetric, resultRow) {
 					// inject workspaceId
 					for num := range metric {
 						metric[num].Labels["workspaceTable"] = to.String(table.Name)
@@ -472,7 +472,7 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLog
 	logger.Debug("metrics parsed")
 }
 
-func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogger, workspaceConfig WorkspaceConfig, queryConfig kusto.ConfigQuery, result chan<- LogAnalyticsProbeResult) {
+func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogger, workspaceConfig WorkspaceConfig, queryConfig kusto.Query, result chan<- LogAnalyticsProbeResult) {
 	workspaceLogger := logger.With(zap.String("workspaceId", workspaceConfig.CustomerID))
 
 	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspace")
@@ -503,7 +503,7 @@ func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogge
 					resultRow[to.String(colName.Name)] = v[colNum]
 				}
 
-				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, queryConfig.MetricConfig, resultRow) {
+				for metricName, metric := range kusto.BuildPrometheusMetricList(queryConfig.Metric, *queryConfig.QueryMetric, resultRow) {
 					// inject workspaceId
 					for num := range metric {
 						metric[num].Labels["workspaceTable"] = to.String(table.Name)

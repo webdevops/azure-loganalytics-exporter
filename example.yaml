@@ -65,21 +65,21 @@ queries:
         metric: azure_metrics_loganalytics_ingestion_latency
         labels:
           type: E2EIngestionLatencyMin
-          le: 95
+          le: "95"
         type: value
 
       - name: percentile_E2EIngestionLatencyMin_75
         metric: azure_metrics_loganalytics_ingestion_latency
         labels:
           type: E2EIngestionLatencyMin
-          le: 75
+          le: "75"
         type: value
 
       - name: percentile_E2EIngestionLatencyMin_50
         metric: azure_metrics_loganalytics_ingestion_latency
         labels:
           type: E2EIngestionLatencyMin
-          le: 50
+          le: "50"
         type: value
 
       ## agent ingestion latency
@@ -87,21 +87,21 @@ queries:
         metric: azure_metrics_loganalytics_ingestion_agent_latency
         labels:
           type: AgentLatencyMin
-          le: 95
+          le: "95"
         type: value
 
       - name: percentile_AgentLatencyMin_75
         metric: azure_metrics_loganalytics_ingestion_agent_latency
         labels:
           type: AgentLatencyMin
-          le: 75
+          le: "75"
         type: value
 
       - name: percentile_AgentLatencyMin_50
         metric: azure_metrics_loganalytics_ingestion_agent_latency
         labels:
           type: AgentLatencyMin
-          le: 50
+          le: "50"
         type: value
 
     defaultField:
