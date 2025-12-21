@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/sha1" // #nosec
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -17,9 +17,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/webdevops/go-common/azuresdk/armclient"
+	"github.com/webdevops/go-common/log/slogger"
 	"github.com/webdevops/go-common/prometheus/kusto"
 	"github.com/webdevops/go-common/utils/to"
-	"go.uber.org/zap"
 
 	"github.com/webdevops/azure-loganalytics-exporter/config"
 )
@@ -50,7 +50,7 @@ type (
 		registry   *prometheus.Registry
 		metricList *kusto.MetricList
 
-		logger *zap.SugaredLogger
+		logger *slogger.Logger
 
 		cache *cache.Cache
 
@@ -85,7 +85,7 @@ type (
 	}
 )
 
-func NewLogAnalyticsProber(logger *zap.SugaredLogger, w http.ResponseWriter, r *http.Request, concurrencyWaitGroup *sizedwaitgroup.SizedWaitGroup) *LogAnalyticsProber {
+func NewLogAnalyticsProber(logger *slogger.Logger, w http.ResponseWriter, r *http.Request, concurrencyWaitGroup *sizedwaitgroup.SizedWaitGroup) *LogAnalyticsProber {
 	prober := LogAnalyticsProber{}
 	prober.logger = logger
 	prober.workspaceList = []WorkspaceConfig{}
@@ -111,11 +111,11 @@ func (p *LogAnalyticsProber) Init() {
 	p.config.moduleName = p.request.URL.Query().Get("module")
 	p.config.optional = p.request.URL.Query().Get("optional") == "true"
 
-	p.logger = p.logger.With(zap.String("module", p.config.moduleName))
+	p.logger = p.logger.With(slog.String("module", p.config.moduleName))
 
 	cacheTime, err := p.parseCacheTime(p.request)
 	if err != nil {
-		p.logger.Error(err)
+		p.logger.Error(err.Error())
 		panic(LogAnalyticsPanicStop{Message: err.Error()})
 	}
 
@@ -136,7 +136,7 @@ func (p *LogAnalyticsProber) SetAzureClient(client *armclient.ArmClient) {
 
 	tagManagerConfig, err := p.Azure.Client.TagManager.ParseTagConfig(p.Conf.Azure.ResourceTags)
 	if err != nil {
-		p.logger.Fatal(err)
+		p.logger.Fatal(err.Error())
 	}
 
 	p.tagManagerConfig = tagManagerConfig
@@ -164,7 +164,7 @@ func (p *LogAnalyticsProber) translateWorkspaceIntoConfig(val string) WorkspaceC
 	if strings.HasPrefix(val, "/subscriptions/") {
 		workspaceResource, err := p.ServiceDiscovery.GetWorkspace(p.ctx, val)
 		if err != nil {
-			p.logger.Panic(err)
+			p.logger.Panic(err.Error())
 		}
 
 		workspaceConfig.ResourceID = to.String(workspaceResource.ID)
@@ -231,10 +231,10 @@ func (p *LogAnalyticsProber) Run() {
 
 		err := p.executeQueries()
 		if err != nil {
-			p.logger.With(zap.String("request", p.request.RequestURI)).Error(err)
+			p.logger.With(slog.String("request", p.request.RequestURI)).Error(err.Error())
 			p.response.WriteHeader(http.StatusBadRequest)
 			if _, writeErr := p.response.Write([]byte("ERROR: " + err.Error())); writeErr != nil {
-				p.logger.Error(writeErr)
+				p.logger.Error(writeErr.Error())
 			}
 			return
 		}
@@ -272,7 +272,7 @@ func (p *LogAnalyticsProber) Run() {
 			}
 		}
 	}
-	p.logger.With(zap.String("duration", time.Since(requestTime).String())).Debug("finished request")
+	p.logger.With(slog.Duration("duration", time.Since(requestTime))).Debug("finished request")
 
 	h := promhttp.HandlerFor(p.GetPrometheusRegistry(), promhttp.HandlerOpts{})
 	h.ServeHTTP(p.response, p.request)
@@ -281,6 +281,8 @@ func (p *LogAnalyticsProber) Run() {
 func (p *LogAnalyticsProber) executeQueries() error {
 	for _, queryRow := range p.QueryConfig.Queries {
 		queryConfig := queryRow
+
+		queryLogger := p.logger.With("metric", queryConfig.Metric)
 
 		workspaceList := p.workspaceList
 		if queryRow.Workspaces != nil && len(*queryRow.Workspaces) >= 1 {
@@ -291,7 +293,8 @@ func (p *LogAnalyticsProber) executeQueries() error {
 		}
 
 		if len(workspaceList) == 0 {
-			return errors.New("no workspaces found")
+			queryLogger.Warn("no workspaces found in query")
+			return nil
 		}
 
 		// check if query matches module name
@@ -300,9 +303,7 @@ func (p *LogAnalyticsProber) executeQueries() error {
 		}
 		startTime := time.Now()
 
-		contextLogger := p.logger.With(zap.String("metric", queryConfig.Metric))
-
-		contextLogger.Debug("starting query")
+		queryLogger.Debug("starting query")
 
 		resultTotalRecords := 0
 
@@ -319,7 +320,7 @@ func (p *LogAnalyticsProber) executeQueries() error {
 					defer wgProbes.Done()
 					defer p.concurrencyWaitGroup.Done()
 					p.sendQueryToMultipleWorkspace(
-						contextLogger,
+						queryLogger,
 						workspaceList,
 						queryConfig,
 						resultChannel,
@@ -337,7 +338,7 @@ func (p *LogAnalyticsProber) executeQueries() error {
 						defer wgProbes.Done()
 						defer p.concurrencyWaitGroup.Done()
 						p.sendQueryToSingleWorkspace(
-							contextLogger,
+							queryLogger,
 							workspaceConfig,
 							queryConfig,
 							resultChannel,
@@ -345,7 +346,7 @@ func (p *LogAnalyticsProber) executeQueries() error {
 					}()
 				}
 			default:
-				contextLogger.Error(fmt.Errorf("invalid queryMode \"%s\"", queryRow.QueryMode))
+				queryLogger.Error("invalid queryMode", slog.String("queryMode", queryRow.QueryMode))
 				resultChannel <- LogAnalyticsProbeResult{
 					Error: fmt.Errorf("invalid queryMode \"%s\"", queryRow.QueryMode),
 				}
@@ -379,12 +380,12 @@ func (p *LogAnalyticsProber) executeQueries() error {
 					"workspaceID": result.WorkspaceId,
 				}).Set(0)
 
-				contextLogger.Error(result.Error)
+				queryLogger.Error(result.Error.Error())
 			}
 		}
 
 		elapsedTime := time.Since(startTime)
-		contextLogger.With(zap.Int("results", resultTotalRecords)).Debugf("fetched %v results", resultTotalRecords)
+		queryLogger.With(slog.Int("results", resultTotalRecords)).Debug("fetched results")
 		prometheusQueryTime.With(prometheus.Labels{"module": p.config.moduleName, "metric": queryConfig.Metric}).Observe(elapsedTime.Seconds())
 		prometheusQueryResults.With(prometheus.Labels{"module": p.config.moduleName, "metric": queryConfig.Metric}).Set(float64(resultTotalRecords))
 	}
@@ -397,6 +398,10 @@ func (p *LogAnalyticsProber) queryWorkspace(workspaces []WorkspaceConfig, queryC
 	logsClient, err := azquery.NewLogsClient(p.Azure.Client.GetCred(), &clientOpts)
 	if err != nil {
 		return azquery.LogsClientQueryWorkspaceResponse{}, err
+	}
+
+	if len(workspaces) == 0 {
+		return azquery.LogsClientQueryWorkspaceResponse{}, fmt.Errorf("no workspaces defined")
 	}
 
 	var timespan *azquery.TimeInterval
@@ -422,10 +427,10 @@ func (p *LogAnalyticsProber) queryWorkspace(workspaces []WorkspaceConfig, queryC
 	return logsClient.QueryWorkspace(p.ctx, workspaces[0].CustomerID, queryBody, &opts)
 }
 
-func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLogger, workspaces []WorkspaceConfig, queryConfig kusto.Query, result chan<- LogAnalyticsProbeResult) {
-	workspaceLogger := logger.With(zap.Any("workspaceId", workspaces))
+func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *slogger.Logger, workspaces []WorkspaceConfig, queryConfig kusto.Query, result chan<- LogAnalyticsProbeResult) {
+	workspaceLogger := logger.With(slog.Any("workspaceId", workspaces))
 
-	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspaces")
+	workspaceLogger.With(slog.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspaces")
 
 	queryResults, queryErr := p.queryWorkspace(workspaces, queryConfig)
 	if queryErr != nil {
@@ -472,10 +477,10 @@ func (p *LogAnalyticsProber) sendQueryToMultipleWorkspace(logger *zap.SugaredLog
 	logger.Debug("metrics parsed")
 }
 
-func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *zap.SugaredLogger, workspaceConfig WorkspaceConfig, queryConfig kusto.Query, result chan<- LogAnalyticsProbeResult) {
-	workspaceLogger := logger.With(zap.String("workspaceId", workspaceConfig.CustomerID))
+func (p *LogAnalyticsProber) sendQueryToSingleWorkspace(logger *slogger.Logger, workspaceConfig WorkspaceConfig, queryConfig kusto.Query, result chan<- LogAnalyticsProbeResult) {
+	workspaceLogger := logger.With(slog.String("workspaceId", workspaceConfig.CustomerID))
 
-	workspaceLogger.With(zap.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspace")
+	workspaceLogger.With(slog.String("query", queryConfig.Query)).Debug("send query to logAnalytics workspace")
 
 	queryResults, queryErr := p.queryWorkspace([]WorkspaceConfig{workspaceConfig}, queryConfig)
 	if queryErr != nil {

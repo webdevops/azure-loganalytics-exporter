@@ -17,22 +17,23 @@ Usage:
   azure-loganalytics-exporter [OPTIONS]
 
 Application Options:
-      --log.debug                     debug mode [$LOG_DEBUG]
-      --log.devel                     development mode [$LOG_DEVEL]
-      --log.json                      Switch log output to json format [$LOG_JSON]
-      --azure.environment=            Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
-      --azure.servicediscovery.cache= Duration for caching Azure ServiceDiscovery of workspaces to reduce API calls (time.Duration)
-                                      (default: 30m) [$AZURE_SERVICEDISCOVERY_CACHE]
-      --azure.resource-tag=           Azure Resource tags (space delimiter) (default: owner) [$AZURE_RESOURCE_TAG]
-      --loganalytics.workspace=       Loganalytics workspace IDs [$LOGANALYTICS_WORKSPACE]
-      --loganalytics.concurrency=     Specifies how many workspaces should be queried concurrently (default: 5) [$LOGANALYTICS_CONCURRENCY]
-  -c, --config=                       Config path [$CONFIG]
-      --server.bind=                  Server address (default: :8080) [$SERVER_BIND]
-      --server.timeout.read=          Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
-      --server.timeout.write=         Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
+      --log.level=[trace|debug|info|warning|error] Log level (default: info) [$LOG_LEVEL]
+      --log.format=[logfmt|json]                   Log format (default: logfmt) [$LOG_FORMAT]
+      --log.source=[|short|file|full]              Show source for every log message (useful for debugging and bug reports) [$LOG_SOURCE]
+      --log.color=[|auto|yes|no]                   Enable color for logs [$LOG_COLOR]
+      --log.time                                   Show log time [$LOG_TIME]
+      --azure.environment=                         Azure environment name (default: AZUREPUBLICCLOUD) [$AZURE_ENVIRONMENT]
+      --azure.servicediscovery.cache=              Duration for caching Azure ServiceDiscovery of workspaces to reduce API calls (time.Duration) (default: 30m) [$AZURE_SERVICEDISCOVERY_CACHE]
+      --azure.resource-tag=                        Azure Resource tags (space delimiter) (default: owner) [$AZURE_RESOURCE_TAG]
+      --loganalytics.workspace=                    Loganalytics workspace IDs [$LOGANALYTICS_WORKSPACE]
+      --loganalytics.concurrency=                  Specifies how many workspaces should be queried concurrently (default: 5) [$LOGANALYTICS_CONCURRENCY]
+  -c, --config=                                    Config path [$CONFIG]
+      --server.bind=                               Server address (default: :8080) [$SERVER_BIND]
+      --server.timeout.read=                       Server read timeout (default: 5s) [$SERVER_TIMEOUT_READ]
+      --server.timeout.write=                      Server write timeout (default: 10s) [$SERVER_TIMEOUT_WRITE]
 
 Help Options:
-  -h, --help                          Show this help message
+  -h, --help                                       Show this help message
 ```
 
 for Azure API authentication (using ENV vars) see https://docs.microsoft.com/en-us/azure/developer/go/azure-sdk-authentication

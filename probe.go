@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
-
-	"go.uber.org/zap"
 
 	"github.com/webdevops/azure-loganalytics-exporter/loganalytics"
 )
@@ -17,11 +16,11 @@ func handleProbePanic(w http.ResponseWriter, r *http.Request) {
 			msg := fmt.Sprintf("ERROR: %v", v.Message)
 			http.Error(w, msg, http.StatusBadRequest)
 		case error:
-			logger.Error(err)
+			logger.Error(v.Error())
 			http.Error(w, v.Error(), http.StatusBadRequest)
 		default:
 			msg := fmt.Sprintf("%v", err)
-			logger.With(zap.String("request", r.RequestURI)).Errorf(msg)
+			logger.With(slog.String("request", r.RequestURI)).Error(msg)
 			http.Error(w, msg, http.StatusBadRequest)
 		}
 	}

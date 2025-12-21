@@ -10,7 +10,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
 	"github.com/webdevops/go-common/azuresdk/armclient"
-	"go.uber.org/zap"
+	"github.com/webdevops/go-common/log/slogger"
 )
 
 type (
@@ -26,7 +26,7 @@ func (sd *LogAnalyticsServiceDiscovery) ResourcesClient(subscriptionId string) *
 
 	client, err := armoperationalinsights.NewWorkspacesClient(subscriptionId, azureClient.GetCred(), azureClient.NewArmClientOptions())
 	if err != nil {
-		prober.logger.Panic(err)
+		prober.logger.Panic(err.Error())
 	}
 
 	return client
@@ -90,7 +90,7 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 
 	subscriptionList, err := ParamsGetListRequired(params, "subscription")
 	if err != nil {
-		contextLogger.Error(err)
+		contextLogger.Error(err.Error())
 		panic(LogAnalyticsPanicStop{Message: err.Error()})
 	}
 
@@ -129,7 +129,7 @@ func (sd *LogAnalyticsServiceDiscovery) ServiceDiscovery() {
 	}
 }
 
-func (sd *LogAnalyticsServiceDiscovery) findWorkspaces(logger *zap.SugaredLogger, subscriptionList []string) {
+func (sd *LogAnalyticsServiceDiscovery) findWorkspaces(logger *slogger.Logger, subscriptionList []string) {
 	prober := sd.prober
 
 	query := "resources \n"
@@ -153,7 +153,7 @@ func (sd *LogAnalyticsServiceDiscovery) findWorkspaces(logger *zap.SugaredLogger
 		opts,
 	)
 	if err != nil {
-		logger.Panic(err)
+		logger.Panic(err.Error())
 	}
 
 	for _, row := range result {
